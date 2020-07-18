@@ -10,7 +10,7 @@
 ### Input : 
             -aws_key_pair <nairp-keypair-hosted-admin>
             -aws_resource_name_prefix NAIRP
-            -git_repo_http_clone_link "https://nairp-iitkgp:iJRxE6n4oxpEaSpg4Ppr@gitlab.com/nairp-iitkgp/nairp2.git"
+            -git_repo_http_clone_link ""
             -git_repo_script_dir "nairp2/system/scripts/"
             -git_repo_top_dir "nairp2"
 
