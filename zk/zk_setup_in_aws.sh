@@ -10,6 +10,7 @@
 ### Input : 
             -aws_key_pair <nairp-keypair-hosted-admin>
             -aws_resource_name_prefix NAIRP
+            -git_repo_http_clone_link "https://username:deploytoken@gitlab.com/nairp-iitkgp/nairp2.git"
             -git_repo_http_clone_link ""
             -git_repo_script_dir "nairp2/system/scripts/"
             -git_repo_top_dir "nairp2"
@@ -410,15 +411,6 @@ configureGlobals()
 
     #-------- Global installation settings
     INSTALL_HOME=$HOME/installed_softwares
-
-    SYSTEM_USERNAME=sourasis
-    #usermod -aG sudo <username>
-    #sudo whoami   =====> root
-    #/etc/sudoers =====> <username> ALL=(ALL) NOPASSWD:ALL
-
-
-    #-------- Gitlab repo settings
-    GITLAB_CLONE_COMMAND_NAIRP="git clone https://$GITLAB_DEPLOY_USERNAME:$GITLAB_DEPLOY_TOKEN@gitlab.com/$GITLAB_USERNAME/$GITLAB_REPOSITORY"
 
 
     #-------- Zookeeper download settings

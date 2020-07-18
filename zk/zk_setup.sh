@@ -19,19 +19,6 @@ configureGlobals()
     #-------- Global installation settings
     INSTALL_HOME=$HOME/installed_softwares
 
-    SYSTEM_USERNAME=sourasis
-    #usermod -aG sudo <username>
-    #sudo whoami   =====> root
-    #/etc/sudoers =====> <username> ALL=(ALL) NOPASSWD:ALL
-
-
-    #-------- Gitlab repo settings
-    GITLAB_USERNAME=
-    GITLAB_REPOSITORY=
-    GITLAB_DEPLOY_USERNAME=
-    GITLAB_DEPLOY_TOKEN=
-    GITLAB_CLONE_COMMAND_NAIRP="git clone https://$GITLAB_DEPLOY_USERNAME:$GITLAB_DEPLOY_TOKEN@gitlab.com/$GITLAB_USERNAME/$GITLAB_REPOSITORY"
-
 
     #-------- Zookeeper download settings
     ZK_VERSION="zookeeper-3.6.1"
