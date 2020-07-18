@@ -418,10 +418,6 @@ configureGlobals()
 
 
     #-------- Gitlab repo settings
-    GITLAB_USERNAME=nairp-iitkgp
-    GITLAB_REPOSITORY=nairp2.git
-    GITLAB_DEPLOY_USERNAME=nairp-iitkgp
-    GITLAB_DEPLOY_TOKEN=iJRxE6n4oxpEaSpg4Ppr
     GITLAB_CLONE_COMMAND_NAIRP="git clone https://$GITLAB_DEPLOY_USERNAME:$GITLAB_DEPLOY_TOKEN@gitlab.com/$GITLAB_USERNAME/$GITLAB_REPOSITORY"
 
 
