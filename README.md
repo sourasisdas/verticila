@@ -1,2 +1,2 @@
 # verticila
-Utility programs developed through passage of time.
+Utility programs developed through passage of time. 
