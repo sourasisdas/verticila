@@ -10,10 +10,10 @@
 ### Input : 
             -aws_key_pair <nairp-keypair-hosted-admin>
             -aws_resource_name_prefix NAIRP
-            -git_repo_http_clone_link "https://username:deploytoken@gitlab.com/nairp-iitkgp/nairp2.git"
-            -git_repo_http_clone_link ""
-            -git_repo_script_dir "nairp2/system/scripts/"
-            -git_repo_top_dir "nairp2"
+
+GIT_REPO_HTTP_CLONE_LINK="https://github.com/sourasisdas/verticila.git"
+GIT_REPO_TOP_DIR="verticila/zk/"
+ZK_SETUP_SH="$GIT_REPO_TOP_DIR/zk/zk_setup.sh"
 
 ### Check AWS CLI installation
 
@@ -40,8 +40,6 @@ AWS_BUILTIN_POLICY_ARN_FOR_EC2_TO_ALLOW_SSM=arn:aws:iam::aws:policy/service-role
         mkdir -p $GIT_PRIVATE_DIR
         touch $GIT_PRIVATE_DIR/GIT_REPO_HTTP_CLONE_LINK
         echo $GIT_REPO_HTTP_CLONE_LINK >&! $GIT_PRIVATE_DIR/GIT_REPO_HTTP_CLONE_LINK
-        touch $GIT_PRIVATE_DIR/GIT_REPO_SCRIPT_DIR
-        echo $GIT_REPO_SCRIPT_DIR >&! $GIT_PRIVATE_DIR/GIT_REPO_SCRIPT_DIR
         "
    - Return its public IP & private IP
 
@@ -51,25 +49,19 @@ AWS_BUILTIN_POLICY_ARN_FOR_EC2_TO_ALLOW_SSM=arn:aws:iam::aws:policy/service-role
    - TCP 8080, privateIP/32 of EC2 instance just started
 
 ### this -> aws_ssm
-mkdir -p /home/ec2-user/installed_softwares/hosting_scripts/
-cd /home/ec2-user/installed_softwares/hosting_scripts/
+mkdir -p /home/ec2-user/installed_softwares/
+cd /home/ec2-user/installed_softwares/
 
 sudo yum -y install git
 
 GIT_REPO_HTTP_CLONE_LINK=`cat .git_private/GIT_REPO_HTTP_CLONE_LINK`
 git clone $GIT_REPO_HTTP_CLONE_LINK
 
-GIT_REPO_SCRIPT_DIR=`cat .git_private/GIT_REPO_SCRIPT_DIR`
-mv $SCRIPTS_PATH_IN_GIT_REP/* .
-
-GIT_REPO_TOP_DIR=`cat .git_private/GIT_REPO_TOP_DIR`
-rm -rf $GIT_REPO_TOP_DIR
-
 MY_PRIVATE_IP=`curl -s http://169.254.169.254/latest/meta-data/local-ipv4`
-./zk_setup.sh -action zk_install -zk_install_mode multi_server -zk_node_count 1 -zk_node_id 1 -zk_node_ip $MY_PRIVATE_IP
+$ZK_SETUP_SH -action zk_install -zk_install_mode multi_server -zk_node_count 1 -zk_node_id 1 -zk_node_ip $MY_PRIVATE_IP
 
-./zk_setup.sh -zk_install_mode multi_server -zk_node_count 1 -action zk_start
-./zk_setup.sh -zk_install_mode multi_server -zk_node_count 1 -action zk_status | grep leader >& /dev/null
+$ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_start
+$ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_status | grep leader >& /dev/null
 if [ $? -eq 0 ]
 then
     exit 0
