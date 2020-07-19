@@ -8,6 +8,12 @@
 ############### Developer modifiable Configurations #######################
 configureGlobals()
 {
+    #-------- Script framework settings
+    MY_ABS_PATH=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
+    VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
+    source $VERTICILA_HOME/sys/sys_utils.sh
+    sys_setFramework
+
     #-------- Zookeeper download settings
     ZK_VERSION="zookeeper-3.6.1"
     ZK_BIN_NAME=apache-$ZK_VERSION-bin
@@ -1024,11 +1030,6 @@ downloadAndValidateSolr()
 ############### Main Function ##############################################
 main()
 {
-    MY_ABS_PATH=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
-    source $VERTICILA_HOME/sys/sys_utils.sh
-    sys_setFramework
-
     configureGlobals
     parseAndValidateCommandLine $@
 
