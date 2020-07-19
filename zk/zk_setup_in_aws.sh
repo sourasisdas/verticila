@@ -1,10 +1,12 @@
 #!/bin/bash
 
-##############################################################################
-# ABOUT: This script can be used for distributed setup of Ensemble ZooKeeper #
-#        in AWS EC2 from scratch, completely remotely using AWS CLI and AWS  #
-#        SSM.                                                                #
-##############################################################################
+###############################################################################
+# ABOUT: This script can be used for distributed setup of Ensemble ZooKeeper  #
+#        in AWS EC2 from scratch, completely remotely using AWS CLI and AWS   #
+#        SSM.                                                                 #
+#        It sets up EC2, including its role, policy, security group, and then #
+#        remotely installs and starts the Zookeeper nodes in the EC2.         # 
+###############################################################################
 
 ### Input : 
 #            -aws_key_pair <nairp-keypair-hosted-admin>
@@ -65,7 +67,7 @@ createSecurityGroupIfDoesNotExist()
 }
 
 
-createPolicyIfDoesNotExist()
+createRoleForSsmIfDoesNotExist()
 {
     # TBD
     #### this -> aws_role.sh
@@ -135,16 +137,26 @@ main()
 
     #### TBD: this -> aws_ebs.sh: Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
 
-    createPolicyIfDoesNotExist
+    createRoleForSsmIfDoesNotExist
 
     # if "-ec2 create" is passed. Returns [ID, Public IP, Private IP]
-    createEc2
-    # else
-    # -ec2 ID must have been passed
+        createEc2
+    # else # -ec2 ID must have been passed
+        #Ensure EC2 running
+        #attachRoleForSsmToEc2IfNotAttached
+        #attachSecurityGroupToEc2IfNotAttached
 
     addPermissionsToSecurityGroup
 
-    startFirstZookeeperNodeOnEc2 "12345678890"
+    # if $ACTION == "start_first"
+        startFirstZookeeperNodeOnEc2 "12345678890"
+        # If successful
+        #    echo "0 $Ec2ID $Ec2PublicIP $Ec2PrivateIP"
+        #    exit 0
+        # Else
+        #    Terminate EC2 if created, or, stop EC2 if started.
+        #    echo "1"
+        #    exit 1
 
 }
 
