@@ -8,18 +8,6 @@
 ############### Developer modifiable Configurations #######################
 configureGlobals()
 {
-    #-------- This script's output settings
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    BLUE='\033[0;34m'
-    YELLOW='\033[0;33m'
-    NC='\033[0m'
-
-
-    #-------- Global installation settings
-    INSTALL_HOME=$HOME/installed_softwares
-
-
     #-------- Zookeeper download settings
     ZK_VERSION="zookeeper-3.6.1"
     ZK_BIN_NAME=apache-$ZK_VERSION-bin
@@ -92,57 +80,6 @@ configureGlobals()
 }
 ###########################################################################
 
-checkIfNonNegativeInteger()
-{
-    #local regexForInt='^[0-9]+$'
-    local regexForInt='^[1-9]+[0-9]*$|^0$'
-    if ! [[ $1 =~ $regexForInt ]] ; then
-       echo 0
-    else
-       echo 1
-    fi
-}
-
-checkIfNumberBetween0And255()
-{
-    local isValid=0
-    local isNumber="$(checkIfNonNegativeInteger $1)"
-    if [ $isNumber -eq 0 ]
-    then
-        echo "0"
-    elif [[ $1 -ge 0 && $1 -le 255 ]]
-    then
-        echo "1"
-    else
-        echo "0"
-    fi
-}
-
-checkIfValidIpv4()
-{
-    local isValid=0
-    local ip=$1
-    if [ $ip == "localhost" ]
-    then
-        isValid=1
-    else
-        local numberOfFields=`echo $ip | awk -F. '{ print NF }'`
-        if [ $numberOfFields -eq 4 ]
-        then
-            read f1 f2 f3 f4 <<< $( echo ${ip} | awk -F. '{print $1" "$2" "$3" "$4}' )
-            local isNumber1="$(checkIfNumberBetween0And255 $f1)"
-            local isNumber2="$(checkIfNumberBetween0And255 $f2)"
-            local isNumber3="$(checkIfNumberBetween0And255 $f3)"
-            local isNumber4="$(checkIfNumberBetween0And255 $f4)"
-            if [[ $isNumber1 -eq 1 && ( $isNumber2 -eq 1 && ( $isNumber3 -eq 1 && $isNumber4 -eq 1 ) ) ]]
-            then
-                isValid=1
-            fi
-        fi
-    fi
-    echo "$isValid"
-}
-
 getIpsIfValidIpv4String()
 {
     # Checks if input is pipe '|' separated valid ip addresses (possibly single IP 'localhost')
@@ -167,7 +104,7 @@ getIpsIfValidIpv4String()
         for i in $(seq 1 $numberOfFields);
         do
             local ip=`echo $ipStr | awk -v k=$i -F'|' '{print $k}'`
-            local isValidIp="$(checkIfValidIpv4 $ip)"
+            local isValidIp="$(sys_checkIfValidIpv4 $ip)"
             if [ $isValidIp -eq 0 ]
             then
                 isValid=0
@@ -304,7 +241,7 @@ parseAndValidateCommandLine()
         echo -e "${RED}ABORTING: Switch ${NC}-zk_node_ip <ip address>${RED} is mandatory if zk_install_mode is multi_server.${NC}"
         local shouldAbort=1
     fi
-    isValidZkNodeIp="$(checkIfValidIpv4 $ZK_NODE_IP)"
+    isValidZkNodeIp="$(sys_checkIfValidIpv4 $ZK_NODE_IP)"
     if [ $isValidZkNodeIp -ne 1 ]
     then
         echo -e "${RED}ABORTING: Argument ${NC}$ZK_NODE_IP${RED} passed to ${NC}-zk_node_ip${RED} is not a valid IP address.${NC}"
@@ -493,59 +430,6 @@ parseAndValidateCommandLine()
     fi
 }
 ###########################################################################
-
-
-############### Determine OS (Supported: MAC, RHEL, UBUNTU) ###############
-determineOS()
-{
-    OS=RHEL
-    
-    sw_vers -productName 2> /dev/null | grep -i "Mac OS" > /dev/null
-    if [ $? -eq 0 ]
-    then
-        OS=MAC
-    else
-        lsb_release -a 2> /dev/null | grep -i ubuntu > /dev/null
-        if [ $? -eq 0 ]
-        then
-            OS=UBUNTU
-        fi
-    fi
-    echo -e "-> Script has detected OS: ${BLUE}$OS${NC}"
-}
-############################################################################
-
-
-############### Set installer based on $OS #################################
-setInstallerBasedOnOS()
-{
-    INSTALLER="yum"
-    if [ $OS == "MAC" ]
-    then
-        INSTALLER="brew"
-    elif [ $OS == "UBUNTU" ]
-    then
-        INSTALLER="apt"
-    fi
-    echo -e "-> Script has set installer: ${BLUE}$INSTALLER${NC}"
-}
-############################################################################
-
-
-############### Check if installers are installed  #########################
-validateInstallationOfInstallers()
-{
-    which $INSTALLER | grep $INSTALLER >& /dev/null
-    if [ $? -eq 0 ]
-    then
-        echo -e "-> Checking installation of $INSTALLER: ${GREEN}OK${NC}"
-    else
-        echo -e "-> Checking installation of $INSTALLER: ${RED}FAILED${NC}"
-        echo -e "${RED}ABORTING: This script depends on the package installer '$INSTALLER'. Please install it in the system manually and rerun this script.${NC}"
-        exit 1;
-    fi
-}
-############################################################################
 
 
 ############### Check for packages required ################################
@@ -1140,14 +1024,19 @@ downloadAndValidateSolr()
 ############### Main Function ##############################################
 main()
 {
+    MY_ABS_PATH=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
+    VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
+    source $VERTICILA_HOME/sys/sys_utils.sh
+    sys_setFramework
+
     configureGlobals
     parseAndValidateCommandLine $@
 
     if [ $ACTION == "zk_install" ]
     then
-        determineOS
-        setInstallerBasedOnOS
-        validateInstallationOfInstallers
+        sys_getOS
+        sys_setInstallerBasedOnOS
+        sys_validateInstallationOfInstallers
         checkForRequiredPackages
         installMissingPackages
         downloadAndValidateZookeeper
@@ -1166,9 +1055,9 @@ main()
         statusZookeeperServer
     elif [ $ACTION == "sl_install" ]
     then
-        determineOS
-        setInstallerBasedOnOS
-        validateInstallationOfInstallers
+        sys_getOS
+        sys_setInstallerBasedOnOS
+        sys_validateInstallationOfInstallers
         checkForRequiredPackages
         installMissingPackages
         downloadAndValidateSolr
