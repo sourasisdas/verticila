@@ -25,18 +25,18 @@ configureGlobals()
 
 
 
-#### this -> aws_secgrp_commands
+#### this -> aws_secgrp.sh
 #- Create security group ${AWS_RESOURCE_NAME_PREFIX}-ZK-Security-Group (if does not exist)
 #
-#### this -> aws_ebs_commands
+#### this -> aws_ebs.sh
 #- (?) Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
 #
-#### this -> aws_role_commands
+#### this -> aws_role.sh
 #AWS_BUILTIN_POLICY_ARN_FOR_EC2_TO_ALLOW_SSM=arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
 #- Create role ${AWS_RESOURCE_NAME_PREFIX}-Role-SSM-For-EC2 (if does not exist)
 #   - Attach policy $AWS_BUILTIN_POLICY_ARN_FOR_EC2_TO_ALLOW_SSM
 #
-#### this -> aws_ec2_commands
+#### this -> aws_ec2.sh
 #- Create instance t3.medium (-ec2 create|ID -> either creates new ec2, or uses given ID)
 #   - Use given key_pair
 #   - (?) Attach EBS ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 (if -ec2 ID given, and it does not have attached EBS already)
@@ -51,7 +51,7 @@ configureGlobals()
 #        "
 #   - Return its public IP & private IP
 #
-#### this -> aws_secgrp_commands
+#### this -> aws_secgrp.sh
 #- Add security group permissions to ${AWS_RESOURCE_NAME_PREFIX}-ZK-Security-Group (if not already permitted)
 #   - TCP 22, myip/32
 #   - TCP 8080, privateIP/32 of EC2 instance just started

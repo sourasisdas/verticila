@@ -149,6 +149,7 @@ else
     shouldAbort=1
 fi
 
+#-------- Validate -secgrp
 if [ $secGrpGiven -ne 1 ]
 then
     echo -e "${RED}ABORTING: Missing mandatory switch: ${NC}-secgrp${RED}. Script will exit.${NC}"

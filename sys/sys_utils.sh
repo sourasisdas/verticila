@@ -153,9 +153,13 @@ sys_installAwsCliIfNotPresent()
             ;;
         UBUNTU)
             echo -e "${RED}TBD${NC}"
+            echo -e "${RED}ABORTING: OS '$OS' yet to be supported. Script will exit.${NC}"
+            exit 1
             ;;
         RHEL)
             echo -e "${RED}TBD${NC}"
+            echo -e "${RED}ABORTING: OS '$OS' yet to be supported. Script will exit.${NC}"
+            exit 1
             ;;
         *)
             echo -e "${RED}FAILED${NC}"
