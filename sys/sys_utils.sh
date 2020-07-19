@@ -38,6 +38,8 @@ sys_getOS()
 ################ Set installer dependeing on OS #######################################
 sys_setInstallerBasedOnOS()
 {
+    sys_getOS
+
     INSTALLER="yum"
     if [ $OS == "MAC" ]
     then
@@ -121,6 +123,8 @@ sys_checkIfValidIpv4()
 ################ Install AWS CLI if not present ######################################
 sys_installAwsCliIfNotPresent()
 {
+    sys_getOS
+
     aws --version | grep aws-cli >& /dev/null
     if [ $? -eq 0 ]
     then
@@ -152,9 +156,32 @@ sys_installAwsCliIfNotPresent()
             fi
             ;;
         UBUNTU)
-            echo -e "${RED}TBD${NC}"
-            echo -e "${RED}ABORTING: OS '$OS' yet to be supported. Script will exit.${NC}"
-            exit 1
+            curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" >& /dev/null
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}FAILED${NC}"
+                echo -e "${RED}ABORTING: Failed downloading of AWS CLI. Script will exit.${NC}"
+                exit 1
+            fi
+
+            unzip awscliv2.zip >& /dev/null
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}FAILED${NC}"
+                echo -e "${RED}ABORTING: Failed unzipping of AWS CLI. Script will exit.${NC}"
+                exit 1
+            fi
+
+            sudo ./aws/install >& /dev/null
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}FAILED${NC}"
+                echo -e "${RED}ABORTING: Failed installation of AWS CLI. Script will exit.${NC}"
+                exit 1
+            else
+                rm -rf aws awscliv2.zip >& /dev/null
+                echo -e "${GREEN}UNTESTED OK${NC}"
+            fi
             ;;
         RHEL)
             echo -e "${RED}TBD${NC}"
