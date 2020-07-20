@@ -53,7 +53,9 @@ printHelpMessage()
     echo -e "       Performs the action."
     echo -e "       grant        : Grants permission to given security group."
     echo -e "       revoke       : Revokes permission from given security group."
-    echo -e "       check_exists : Returns 0 iff given security group exists."
+    echo -e "       check_exists : Prints 'exists' on-screen and returns status 0 if given"
+    echo -e "                      security group exists. Else prints 'none' on screen, and"
+    echo -e "                      returns status 1."
     echo -e "       create       : Creates security group with given name."
     echo -e "       Switch Type  : ${YELLOW}Mandatory${NC}"
     echo -e
@@ -202,49 +204,69 @@ parseAndValidateCommandLine()
 
 
 ############### AWS Command Preparation and invocation #################################
-prepareAndExecuteCommand()
+revokeOrGrantPermission()
 {
-    #---------------------------------- Prepare command
-    case $USER_ACTION in
-        revoke|grant)
-            commandString="aws ec2 $SCRIPT_ACTION \
-                           --profile $PROFILE_NAME \
-                           --group-name $SECURITY_GROUP \
-                           --region $REGION \
-                           --protocol $PROTOCOL \
-                           --port $PORT \
-                           --cidr ${WHITELISTED_CIDR}"
-            ;;
-        check_exists)
-            commandString="aws ec2 $SCRIPT_ACTION \
-                           --profile $PROFILE_NAME \
-                           --group-name $SECURITY_GROUP \
-                           --region $REGION"
-            ;;
-        create)
-            commandString="aws ec2 $SCRIPT_ACTION \
-                           --profile $PROFILE_NAME \
-                           --group-name $SECURITY_GROUP \
-                           --region $REGION \
-                           --description $DESCRIPTION "
-            ;;
-        *)
-            commandString="invalid_command"
-            ;;
-    esac
-    
-    #---------------------------------- Execute command
-    commandExecutionStatus=1
+    commandString="aws ec2 $SCRIPT_ACTION \
+                   --profile $PROFILE_NAME \
+                   --group-name $SECURITY_GROUP \
+                   --region $REGION \
+                   --protocol $PROTOCOL \
+                   --port $PORT \
+                   --cidr ${WHITELISTED_CIDR}"
+
     if [ $SHADOW_MODE -eq 0 ]
     then
-        eval $commandString
-        commandExecutionStatus=$?
+        echo "################ $commandString" >& /dev/null
+        eval $commandString >& /dev/null
     else
         echo $commandString
     fi
-
-    exit $commandExecutionStatus
+    exit $?
 }
+
+checkIfSecurityGroupExists()
+{
+    commandString="aws ec2 $SCRIPT_ACTION \
+                   --profile $PROFILE_NAME \
+                   --group-name $SECURITY_GROUP \
+                   --region $REGION"
+
+    if [ $SHADOW_MODE -eq 0 ]
+    then
+        echo "################ $commandString" >& /dev/null
+        eval $commandString >& /dev/null
+        if [ $? -eq 0 ]
+        then
+            echo "exists"
+            exit 0
+        else
+            echo "none"
+            exit 1
+        fi
+    else
+        echo $commandString
+    fi
+    exit $?
+}
+
+createSecurityGroup()
+{
+    commandString="aws ec2 $SCRIPT_ACTION \
+                   --profile $PROFILE_NAME \
+                   --group-name $SECURITY_GROUP \
+                   --region $REGION \
+                   --description $DESCRIPTION "
+
+    if [ $SHADOW_MODE -eq 0 ]
+    then
+        echo "################ $commandString" >& /dev/null
+        eval $commandString >& /dev/null
+    else
+        echo $commandString
+    fi
+    exit $?
+}
+
 
 
 ############### Main ##################################################################
@@ -252,7 +274,20 @@ main()
 {
     configureGlobals
     parseAndValidateCommandLine $@
-    prepareAndExecuteCommand
+    case $USER_ACTION in
+        revoke|grant)
+            revokeOrGrantPermission
+            ;;
+        check_exists)
+            checkIfSecurityGroupExists
+            ;;
+        create)
+            createSecurityGroup
+            ;;
+        *)
+            :
+            ;;
+    esac
 }
 
 main $@

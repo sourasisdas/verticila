@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ###########################################################################
-# ABOUT: sou_lorem_epsom                                                  #
-#        sou_more_lorem_epsom.                                            #
+# ABOUT: This script sou_lorem_epsom                                      #
+#        Run srcipt with '-help' for more information.                    #
 #                                                                         #
 ###########################################################################
 
@@ -17,12 +17,12 @@ configureGlobals()
     sys_setFramework
 
     #--------- Default values of script input parameters
+    #ACTION_DEFAULT="Invalid_Action"
     #SOU_A_DEFAULT="sou_a_default"
-    #SOU_B_DEFAULT="sou_b_default"
 
+    #--------- Script input parameters
+    #ACTION=$ACTION_DEFAULT
     #SOU_A=$SOU_A_DEFAULT
-    #SOU_B=$SOU_B_DEFAULT
-    #SOU_C=""
 
     HELP_MODE=0
     SHADOW_MODE=0
@@ -43,6 +43,14 @@ printHelpMessage()
     echo -e "${GREEN}[ -s | -shadow ]"${NC}
     echo -e "       Runs this script in shadow mode - does not execute any AWS command, just prints"
     echo -e "       it on screen."
+    echo -e
+    #echo -e "${GREEN}[ -action <check_exists | create> ]${NC}"
+    #echo -e "       Performs the action."
+    #echo -e "       check_exists : Prints 'exists' on-screen and returns status 0 if given"
+    #echo -e "                      key-pair exists. Else prints 'none' on screen, and returns"
+    #echo -e "                      status 1."
+    #echo -e "       create       : Creates key-pair with given <key_name> with switch -key_file."
+    #echo -e "       Switch Type  : ${YELLOW}Mandatory${NC}."
     #echo -e
     #echo -e "${GREEN}[ -sou_switch_1 <sou_val_1 | sou_val_2> ]${NC}"
     #echo -e "       Performs the action."
@@ -55,8 +63,11 @@ printHelpMessage()
     echo -e
     echo -e
     echo -e "Use Cases:"
-    #echo -e "${BLUE}[ sou_val_1 | sou_val_2 ]${NC}"
-    #echo -e "$SCRIPT_BASE_NAME -sou_switch_1 sou_val_1 [-sou_switch_2 sou_val_As_string]"
+    #echo -e "${BLUE}[ check_exists ]${NC}"
+    #echo -e "$SCRIPT_BASE_NAME -action check_exists -name N"
+    #echo -e "$SCRIPT_BASE_NAME -action check_exists -id I"
+    #echo -e "${BLUE}[ create ]${NC}"
+    #echo -e "$SCRIPT_BASE_NAME -action create [-sou_switch_2 sou_val_As_string]"
     echo -e "---------------------------------------------------------------"
 }
 
@@ -64,7 +75,7 @@ printHelpMessage()
 ############### Command-line parsing and validation ####################################
 parseAndValidateCommandLine()
 {
-    #sou_mandatorySwitchGiven=0
+    #hasUserProvided_action=0
 
     #--------------------------------- Parse commandline arguments
     while [[ "$#" -gt 0 ]]; do
@@ -75,9 +86,12 @@ parseAndValidateCommandLine()
             -s|-shadow)
                 SHADOW_MODE=1
                 ;;
+    #        -action)
+    #            ACTION=$2
+    #            hasUserProvided_action=1
+    #            shift ;;
     #        -sou_switch_1)
     #            SOU_A=$2
-    #            sou_mandatorySwitchGiven=1
     #            shift ;;
             *)
                 echo -e "${RED}ABORTING: Unknown parameter passed: ${NC}$1${RED}. Script will exit.${NC}"
@@ -88,6 +102,24 @@ parseAndValidateCommandLine()
     done
 
     shouldAbort=0
+
+    ##-------- Validate -action
+    #if [ $hasUserProvided_action == 0 ]
+    #then
+    #    echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-action${RED}. Script will exit.${NC}"
+    #    local shouldAbort=1
+    #else
+    #    case $ACTION in
+    #        check_exists)
+    #            ;;
+    #        create)
+    #            ;;
+    #        *)
+    #            echo -e "${RED}ABORTING: Unknown value ${NC}$ACTION${RED} passed to switch ${NC}-action${RED}. Script will exit.${NC}"
+    #            local shouldAbort=1
+    #            ;;
+    #    esac
+    #fi
 
     #--------------------------------- Validate -sou_switch_1
     # '-sou_switch_1' is Mandatory
@@ -116,11 +148,12 @@ parseAndValidateCommandLine()
         shouldAbort=1
     fi
 
-    #--------------------------------- Exit at shadow mode
-    if [ $SHADOW_MODE -eq 1 ];
-    then
-        shouldAbort=1
-    fi
+    # Before uncommenting below, consider that under shadow mode, AWS commands are just printed.
+    ##--------------------------------- Exit at shadow mode
+    #if [ $SHADOW_MODE -eq 1 ];
+    #then
+    #    shouldAbort=1
+    #fi
 
     #--------------------------------- Abort in case of any issue
     if [ $shouldAbort -eq 1 ];
@@ -148,18 +181,48 @@ parseAndValidateCommandLine()
 #    return
 #}
 
+
+############### AWS Command Preparation and invocation #################################
+
+#checkExistenceOfKeyPairByName()
+#{
+#    local keypair=$1
+#
+#    commandString="aws ec2 describe-key-pairs \
+#                   --key-name $keypair"
+#
+#    if [ $SHADOW_MODE -eq 0 ]
+#    then
+#        echo "################ $commandString" >& /dev/null
+#        eval $commandString >& /dev/null
+#        if [ $? -eq 0 ]
+#        then
+#            echo "exists"
+#            exit 0
+#        else
+#            echo "none"
+#            exit 1
+#        fi
+#    else
+#        echo $commandString
+#    fi
+#    exit $?
+#}
+
+
 ############### Main ##################################################################
 main()
 {
     configureGlobals
     parseAndValidateCommandLine $@
 
-#    if [ $SOU_A == "sou_val_1" ]
+#    if [ $ACTION == "check_exists" ]
 #    then
-#        sou_a_function "sou_arg_1"
-#    elif [ $SOU_A == "sou_val_2" ]
+#        checkExistenceOfKeyPairByName $KEYPAIR_NAME
+#    elif [ $ACTION == "create" ]
 #    then
-#        sou_a_function "sou_arg_2"
+#        :
+#        #TBD
 #    fi
 
     exit 0

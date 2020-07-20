@@ -185,7 +185,7 @@ parseAndValidateCommandLine()
     #-------- Validate -action
     if [ $hasUserProvided_action == 0 ]
     then
-        echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-action <Action name>${RED}. Script will exit.${NC}"
+        echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-action${RED}. Script will exit.${NC}"
         local shouldAbort=1
     else
         case $ACTION in
