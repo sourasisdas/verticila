@@ -1064,6 +1064,8 @@ main()
         downloadAndValidateSolr
         #prepareZookeeperConfigFile
     fi
+
+    exit 0
 }
 
 main $@
