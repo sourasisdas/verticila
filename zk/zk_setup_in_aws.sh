@@ -9,9 +9,12 @@
 ###############################################################################
 
 ### Input : 
-#            -aws_key_pair <nairp-keypair-hosted-admin>
-#            -aws_resource_name_prefix NAIRP
-#            -ec2 create|ID
+#            -action          start_first
+#            -ec2             <create|id=xxxx>
+#            -key_file        /path/to/<key_name>.pem
+#            -resource_prefix <string>
+#            -profile         <aws profile>
+#            -region          <region>
 
 ############### Developer modifiable Configurations #######################
 configureGlobals()
@@ -20,25 +23,170 @@ configureGlobals()
     VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
     source $VERTICILA_HOME/sys/sys_utils.sh
     sys_setFramework
-
+    VERTICILA_AWS_SECGRP_SH="$VERTICILA_HOME/aws/aws_secgrp.sh"
 
     VERTICILA_REPO_HTTP_URL="https://github.com/sourasisdas/verticila.git"
     VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup_aws_local.sh"
-
-
-    VERTICILA_AWS_SECGRP_SH="$VERTICILA_HOME/aws/aws_secgrp.sh"
-
 
     AWS_RESOURCE_NAME_PREFIX_DEFAULT="ZK"
     SECURITY_GROUP_DEFAULT="ZK-Security-Group"
     PROFILE_NAME_DEFAULT=$AWS_PROFILE
     REGION_DEFAULT=ap-south-1
 
+    ACTION="Invalid_Action"
+    HELP_MODE=0
+    SHADOW_MODE=0
+    EC2_OPTION=""
+    EC2_ID=""
+    KEY_FILE=""
 
     SECURITY_GROUP=$SECURITY_GROUP_DEFAULT
     AWS_RESOURCE_NAME_PREFIX=$AWS_RESOURCE_NAME_PREFIX_DEFAULT
     PROFILE_NAME=$PROFILE_NAME_DEFAULT
     REGION=$REGION_DEFAULT
+}
+
+
+printHelpMessage()
+{
+    SCRIPT_BASE_NAME=`basename $0`
+    echo -e "---------------------------------------------------------------"
+    echo -e "Usage: ${GREEN}$SCRIPT_BASE_NAME [Options]${NC}"
+    echo -e
+    echo -e "Options:"
+    echo -e "${GREEN}[ -h | -help ]"${NC}
+    echo -e "       Shows help message and exits."
+    echo -e
+    echo -e "${GREEN}[ -s | -shadow ]"${NC}
+    echo -e "       Runs this script in shadow mode - upto parsing and input validation     ."
+    echo -e
+    echo -e "${GREEN}[ -action <start_first> ]${NC}"
+    echo -e "       Performs the action."
+    echo -e "       start_first : Sets up AWS resources and remotely invokes script that sets up and starts"
+    echo -e "                     the first Zookeeper node in a multiserver settings."
+    echo -e "       Switch Type : ${YELLOW}Mandatory${NC}"
+    echo -e 
+    echo -e "${GREEN}[ -ec2 <create|id=xxxxxxxx> ]${NC}"
+    echo -e "       create      : Does Zookeeper setup on a newly created EC2 instance."
+    echo -e "       id=xxxxxxxx : Does Zookeeper setup on existing EC2 instance with given ID."
+    echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if action is start_first."
+    echo -e
+    echo -e "${GREEN}[ -key_file /path/to/file/<key_name>.pem ]${NC}"
+    echo -e "       The <key_name> part is used to create new EC2 instances."
+    echo -e "       If the given private key file exists, creates a key-pair named <key_name> in EC2 if"
+    echo -e "       it does not exist already."
+    echo -e "       Else creates the key-pair named <key_name> in AWS and stores the private key in the"
+    echo -e "       given file."
+    echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if -ec2 is given."
+    echo -e
+    echo -e "Use Cases:"
+    echo -e "${BLUE}[ start_first ]${NC}"
+    echo -e "$SCRIPT_BASE_NAME -action start_first -ec2 create"
+    echo -e "$SCRIPT_BASE_NAME -action start_first -ec2 id=xxxxxxxx"
+    echo -e "---------------------------------------------------------------"
+}
+
+
+
+parseAndValidateCommandLine()
+{
+    hasUserProvided_action=0
+    hasUserProvided_ec2=0
+    hasUserProvided_key_file=0
+
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            -action)
+                ACTION="$2"
+                hasUserProvided_action=1
+                shift
+                ;;
+            -ec2)
+                EC2_OPTION="$2"
+                hasUserProvided_ec2=1
+                shift
+                ;;
+            -key_file)
+                KEY_FILE="$2"
+                hasUserProvided_key_file=1
+                shift
+                ;;
+            -s|-shadow)
+                SHADOW_MODE=1
+                ;;
+            -h|-help)
+                HELP_MODE=1
+                ;;
+            *)
+                echo -e "${RED}ABORTING: Unknown parameter passed: ${NC}$1${RED}. Script will exit.${NC}"
+                HELP_MODE=1
+                ;;
+        esac
+        shift
+    done
+
+    local shouldAbort=0
+
+    #-------- Validate -action
+    if [ $hasUserProvided_action == 0 ]
+    then
+        echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-action${RED}. Script will exit.${NC}"
+        local shouldAbort=1
+    else
+        case $ACTION in
+            start_first)
+                ;;
+            *)
+                echo -e "${RED}ABORTING: Unknown value ${NC}$ACTION${RED} passed to switch ${NC}-action${RED}. Script will exit.${NC}"
+                local shouldAbort=1
+                ;;
+        esac
+    fi
+
+    #-------- Validate -ec2
+    if [[ $hasUserProvided_action == 1 && $hasUserProvided_ec2 == 0 ]]
+    then
+        echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-ec2${RED}. Script will exit.${NC}"
+        local shouldAbort=1
+    else
+        if [ $EC2_OPTION == "create" ]
+        then
+            :
+        elif [[ $EC2_OPTION == id=* ]]
+        then
+            EC2_ID=`echo $EC2_OPTION | cut -d= -f2`
+            EC2_OPTION="id"
+        else
+            echo -e "${RED}ABORTING: Unknown value ${NC}$EC2_OPTION${RED} passed to switch ${NC}-ec2${RED}. Script will exit.${NC}"
+            local shouldAbort=1
+        fi
+    fi
+
+    #-------- Validate -key_file
+    if [[ $hasUserProvided_ec2 == 1 && $hasUserProvided_key_file == 0 ]]
+    then
+        echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-key_file${RED}. Script will exit.${NC}"
+        local shouldAbort=1
+    fi
+
+    #-------- Validate -h|-help (Print usage)
+    if [ $HELP_MODE -eq 1 ];
+    then
+        printHelpMessage
+        local shouldAbort=1
+    fi
+
+    #-------- Validate -s|-shadow (Runs in shadow mode - upto parsing and input validation)
+    if [ $SHADOW_MODE -eq 1 ];
+    then
+        local shouldAbort=1
+    fi
+
+    #-------- Abort in case of any issue
+    if [ $shouldAbort -eq 1 ];
+    then
+        exit 1;
+    fi
 }
 
 
@@ -130,26 +278,25 @@ startFirstZookeeperNodeOnEc2()
 main()
 {
     configureGlobals
+    parseAndValidateCommandLine $@
 
-    sys_installAwsCliIfNotPresent
+    if [ $ACTION == "start_first" ]
+    then
+        sys_installAwsCliIfNotPresent
+        checkExistenceOrCreateKeyPair "as per help description of -key_file"
+        createSecurityGroupIfDoesNotExist
+        # TBD: this -> aws_ebs.sh: Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
+        createRoleForSsmIfDoesNotExist
+        # if "-ec2 create" is passed. Returns [ID, Public IP, Private IP]
+            createEc2
+        # else # -ec2 ID must have been passed
+            #checkStatusOfEc2Intance $EC2_ID
+            #attachRoleForSsmToEc2IfNotAttached
+            #attachSecurityGroupToEc2IfNotAttached
+        addPermissionsToSecurityGroup
 
-    createSecurityGroupIfDoesNotExist
-
-    #### TBD: this -> aws_ebs.sh: Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
-
-    createRoleForSsmIfDoesNotExist
-
-    # if "-ec2 create" is passed. Returns [ID, Public IP, Private IP]
-        createEc2
-    # else # -ec2 ID must have been passed
-        #Ensure EC2 running
-        #attachRoleForSsmToEc2IfNotAttached
-        #attachSecurityGroupToEc2IfNotAttached
-
-    addPermissionsToSecurityGroup
-
-    # if $ACTION == "start_first"
         startFirstZookeeperNodeOnEc2 "12345678890"
+        #busyWaitForCompletion (aws ssm list-command-invocations --command-id 302c76a3-2212-4b50-957e-b10a17974e76)
         # If successful
         #    echo "0 $Ec2ID $Ec2PublicIP $Ec2PrivateIP"
         #    exit 0
@@ -157,7 +304,7 @@ main()
         #    Terminate EC2 if created, or, stop EC2 if started.
         #    echo "1"
         #    exit 1
-
+    fi
 }
 
 
