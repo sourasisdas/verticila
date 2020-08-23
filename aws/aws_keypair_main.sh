@@ -16,6 +16,9 @@ configureGlobals()
     source $VERTICILA_HOME/sys/sys_utils.sh
     sys_setFramework
 
+    #--------- Include corresponding library
+    source $VERTICILA_HOME/aws/aws_keypair_lib.sh
+
     #--------- Default values of script input parameters
     ACTION_DEFAULT="Invalid_Action"
 
@@ -45,24 +48,27 @@ printHelpMessage()
     echo -e
     echo -e "${GREEN}[ -action <check_exists | create> ]${NC}"
     echo -e "       Performs the action."
-    echo -e "       check_exists : Prints 'exists' on-screen and returns status 0 if given"
-    echo -e "                      key-pair exists. Else prints 'none' on screen, and returns"
-    echo -e "                      status 1."
-    echo -e "       create       : Creates key-pair with given <key_name> with switch -key_file."
+    echo -e "       check_exists : Prints 'exist/does_not_exist' status on-screen and returns"
+    echo -e "                      status 0 if given key-pair exists, else returns non-0 status."
+    echo -e "       create       : Creates key-pair with name given by switch '-name' and"
+    echo -e "                      keeps .pem file \(private key\) at directory given by switch"
+    echo -e "                      '-pem_outdir'."
     echo -e "       Switch Type  : ${YELLOW}Mandatory${NC}."
     echo -e
     echo -e "${GREEN}[ -name <Name of key-pair> ]${NC}"
     echo -e "       Performs the action on the given key-pair."
-    echo -e "       Switch Type  : ${YELLOW}Mandatory${NC} if action is check_exists."
+    echo -e "       Switch Type  : ${YELLOW}Mandatory${NC} if action is one of check_exists, create."
     echo -e
     echo -e
     echo -e "Use Cases:"
     echo -e "${BLUE}[ check_exists ]${NC}"
     echo -e "$SCRIPT_BASE_NAME -action check_exists -name N"
     #echo -e "${BLUE}[ create ]${NC}"
-    #echo -e "$SCRIPT_BASE_NAME -action create [-sou_switch_2 sou_val_As_string]"
+    #echo -e "$SCRIPT_BASE_NAME -action create -name N -pem_outdir D"
     echo -e "---------------------------------------------------------------"
 }
+
+# TBD-INCOMPLETE: Help message for "-pem_outdir", support for "-pem_outdir", populate $PEM_OUT_DIR by commandline parsing, validation for "-create" and associated switches
 
 
 ############### Command-line parsing and validation ####################################
@@ -138,40 +144,6 @@ parseAndValidateCommandLine()
 }
 
 
-############### AWS Command Preparation and invocation ####################################
-checkExistenceOfKeyPairByName()
-{
-    local keypair=$1
-
-    commandString="aws ec2 describe-key-pairs \
-                   --key-name $keypair"
-
-    if [ $SHADOW_MODE -eq 0 ]
-    then
-        echo "################ $commandString" >& /dev/null
-        eval $commandString >& /dev/null
-        if [ $? -eq 0 ]
-        then
-            echo "exists"
-            exit 0
-        else
-            echo "none"
-            exit 1
-        fi
-    else
-        echo $commandString
-    fi
-    exit $?
-}
-
-createKeyPairWithGivenFilePath()
-{
-    :
-#  1) Create keypair with given file path
-#  2) $ aws ec2 create-key-pair --key-name MyKeyPair --query 'KeyMaterial' --output text > MyKeyPa    ir.pem
-}
-
-
 ############### Main ##################################################################
 main()
 {
@@ -180,12 +152,10 @@ main()
 
     if [ $ACTION == "check_exists" ]
     then
-        checkExistenceOfKeyPairByName $KEYPAIR_NAME
-        # TBD: take a log file in all aws/* scripts, where print aws command logs instead of '/dev/null'
+        checkExistence_ofKeyPair_wKeyName $SHADOW_MODE $KEYPAIR_NAME
     elif [ $ACTION == "create" ]
     then
-        :
-        # TBD
+        create_aKeyPair_wKeyName_wPemOutputDir $SHADOW_MODE $KEYPAIR_NAME $PEM_OUT_DIR
     fi
 
     exit 0

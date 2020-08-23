@@ -9,6 +9,9 @@ configureGlobals()
     source $VERTICILA_HOME/sys/sys_utils.sh
     sys_setFramework
 
+    #--------- Include corresponding library
+    source $VERTICILA_HOME/aws/aws_secgrp_lib.sh
+
     #--------- Default values of script input parameters
     PROFILE_NAME_DEFAULT=$AWS_PROFILE
     USER_ACTION_DEFAULT="INVALID_ACTION"
@@ -54,8 +57,8 @@ printHelpMessage()
     echo -e "       grant        : Grants permission to given security group."
     echo -e "       revoke       : Revokes permission from given security group."
     echo -e "       check_exists : Prints 'exists' on-screen and returns status 0 if given"
-    echo -e "                      security group exists. Else prints 'none' on screen, and"
-    echo -e "                      returns status 1."
+    echo -e "                      security group exists. Else prints 'does_not_exist' on screen,"
+    echo -e "                      and returns non-0 status."
     echo -e "       create       : Creates security group with given name."
     echo -e "       Switch Type  : ${YELLOW}Mandatory${NC}"
     echo -e
@@ -202,87 +205,23 @@ parseAndValidateCommandLine()
 }
 
 
-
-############### AWS Command Preparation and invocation #################################
-revokeOrGrantPermission()
-{
-    commandString="aws ec2 $SCRIPT_ACTION \
-                   --profile $PROFILE_NAME \
-                   --group-name $SECURITY_GROUP \
-                   --region $REGION \
-                   --protocol $PROTOCOL \
-                   --port $PORT \
-                   --cidr ${WHITELISTED_CIDR}"
-
-    if [ $SHADOW_MODE -eq 0 ]
-    then
-        echo "################ $commandString" >& /dev/null
-        eval $commandString >& /dev/null
-    else
-        echo $commandString
-    fi
-    exit $?
-}
-
-checkIfSecurityGroupExists()
-{
-    commandString="aws ec2 $SCRIPT_ACTION \
-                   --profile $PROFILE_NAME \
-                   --group-name $SECURITY_GROUP \
-                   --region $REGION"
-
-    if [ $SHADOW_MODE -eq 0 ]
-    then
-        echo "################ $commandString" >& /dev/null
-        eval $commandString >& /dev/null
-        if [ $? -eq 0 ]
-        then
-            echo "exists"
-            exit 0
-        else
-            echo "none"
-            exit 1
-        fi
-    else
-        echo $commandString
-    fi
-    exit $?
-}
-
-createSecurityGroup()
-{
-    commandString="aws ec2 $SCRIPT_ACTION \
-                   --profile $PROFILE_NAME \
-                   --group-name $SECURITY_GROUP \
-                   --region $REGION \
-                   --description $DESCRIPTION "
-
-    if [ $SHADOW_MODE -eq 0 ]
-    then
-        echo "################ $commandString" >& /dev/null
-        eval $commandString >& /dev/null
-    else
-        echo $commandString
-    fi
-    exit $?
-}
-
-
-
 ############### Main ##################################################################
 main()
 {
     configureGlobals
     parseAndValidateCommandLine $@
     case $USER_ACTION in
-        revoke|grant)
-            revokeOrGrantPermission
+        revoke)
+            revokePermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wCidr $SHADOW_MODE $SECURITY_GROUP $PROFILE_NAME $REGION $PROTOCOL $PORT $WHITELISTED_CIDR
+            ;;
+        grant)
+            grantPermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wCidr $SHADOW_MODE $SECURITY_GROUP $PROFILE_NAME $REGION $PROTOCOL $PORT $WHITELISTED_CIDR
             ;;
         check_exists)
-            checkIfSecurityGroupExists
+            checkExistence_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion $SHADOW_MODE $SECURITY_GROUP $PROFILE_NAME $REGION
             ;;
         create)
-            createSecurityGroup
+            create_aSecGrp_wSecGrpName_wDescription_wAwsProfileName_wRegion $SHADOW_MODE $SECURITY_GROUP $DESCRIPTION $PROFILE_NAME $REGION
             ;;
         *)
             :

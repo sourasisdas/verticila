@@ -2,7 +2,7 @@
 
 ###########################################################################
 # ABOUT: This script sou_lorem_epsom                                      #
-#        Run srcipt with '-help' for more information.                    #
+#        Run script with '-help' for more information.                    #
 #                                                                         #
 ###########################################################################
 

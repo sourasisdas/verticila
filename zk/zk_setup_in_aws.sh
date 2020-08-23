@@ -9,7 +9,7 @@
 ###############################################################################
 
 ### Input : 
-#            -action          start_first
+#            -action          start_first_node
 #            -ec2             <create|id=xxxx>
 #            -key_file        /path/to/<key_name>.pem
 #            -resource_prefix <string>
@@ -60,16 +60,16 @@ printHelpMessage()
     echo -e "${GREEN}[ -s | -shadow ]"${NC}
     echo -e "       Runs this script in shadow mode - upto parsing and input validation     ."
     echo -e
-    echo -e "${GREEN}[ -action <start_first> ]${NC}"
+    echo -e "${GREEN}[ -action <start_first_node> ]${NC}"
     echo -e "       Performs the action."
-    echo -e "       start_first : Sets up AWS resources and remotely invokes script that sets up and starts"
+    echo -e "       start_first_node : Sets up AWS resources and remotely invokes script that sets up and starts"
     echo -e "                     the first Zookeeper node in a multiserver settings."
     echo -e "       Switch Type : ${YELLOW}Mandatory${NC}"
     echo -e 
     echo -e "${GREEN}[ -ec2 <create|id=xxxxxxxx> ]${NC}"
     echo -e "       create      : Does Zookeeper setup on a newly created EC2 instance."
     echo -e "       id=xxxxxxxx : Does Zookeeper setup on existing EC2 instance with given ID."
-    echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if action is start_first."
+    echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if action is start_first_node."
     echo -e
     echo -e "${GREEN}[ -key_file /path/to/file/<key_name>.pem ]${NC}"
     echo -e "       The <key_name> part is used to create new EC2 instances."
@@ -80,9 +80,9 @@ printHelpMessage()
     echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if -ec2 is given."
     echo -e
     echo -e "Use Cases:"
-    echo -e "${BLUE}[ start_first ]${NC}"
-    echo -e "$SCRIPT_BASE_NAME -action start_first -ec2 create"
-    echo -e "$SCRIPT_BASE_NAME -action start_first -ec2 id=xxxxxxxx"
+    echo -e "${BLUE}[ start_first_node ]${NC}"
+    echo -e "$SCRIPT_BASE_NAME -action start_first_node -ec2 create"
+    echo -e "$SCRIPT_BASE_NAME -action start_first_node -ec2 id=xxxxxxxx"
     echo -e "---------------------------------------------------------------"
 }
 
@@ -134,7 +134,7 @@ parseAndValidateCommandLine()
         local shouldAbort=1
     else
         case $ACTION in
-            start_first)
+            start_first_node)
                 ;;
             *)
                 echo -e "${RED}ABORTING: Unknown value ${NC}$ACTION${RED} passed to switch ${NC}-action${RED}. Script will exit.${NC}"
@@ -265,7 +265,7 @@ startFirstZookeeperNodeOnEc2()
     cd /home/ec2-user/installed_softwares/ ; \
     sudo yum -y install git ; \
     git clone https://github.com/sourasisdas/verticila.git ; \
-    $VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH -action start_first\
+    $VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH -action start_first_node\
     "
 
     local ssm_command="aws ssm send-command --document-name "\""AWS-RunShellScript"\"" --document-version "\""1"\"" --targets '[{"\""Key"\"":"\""InstanceIds"\"","\""Values"\"":["\""$ec2_instance_id"\""]}]' --parameters '{"\""commands"\"":["\""$remote_command_to_run"\""],"\""workingDirectory"\"":["\"""\""],"\""executionTimeout"\"":["\""$execution_timeout"\""]}' --timeout-seconds $timeout_seconds --max-concurrency "\""50"\"" --max-errors "\""0"\"" --output-s3-bucket-name "\""$output_s3_bucket_name"\"" --region $region"
@@ -280,7 +280,7 @@ main()
     configureGlobals
     parseAndValidateCommandLine $@
 
-    if [ $ACTION == "start_first" ]
+    if [ $ACTION == "start_first_node" ]
     then
         sys_installAwsCliIfNotPresent
         checkExistenceOrCreateKeyPair "as per help description of -key_file"
