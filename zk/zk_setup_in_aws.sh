@@ -25,11 +25,17 @@ configureGlobals()
     sys_setFramework
     VERTICILA_AWS_SECGRP_SH="$VERTICILA_HOME/aws/aws_secgrp.sh"
 
+    source $VERTICILA_HOME/aws/aws_ec2_lib.sh
+    source $VERTICILA_HOME/aws/aws_keypair_lib.sh
+    source $VERTICILA_HOME/aws/aws_secgrp_lib.sh
+    source $VERTICILA_HOME/aws/aws_role_lib.sh
+
     VERTICILA_REPO_HTTP_URL="https://github.com/sourasisdas/verticila.git"
     VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup_aws_local.sh"
 
     AWS_RESOURCE_NAME_PREFIX_DEFAULT="ZK"
     SECURITY_GROUP_DEFAULT="ZK-Security-Group"
+    SECURITY_GROUP_DESC_DEFAULT="Zookeeper-Ensemble-Security-Group"
     PROFILE_NAME_DEFAULT=$AWS_PROFILE
     REGION_DEFAULT=ap-south-1
 
@@ -190,42 +196,6 @@ parseAndValidateCommandLine()
 }
 
 
-createSecurityGroupIfDoesNotExist()
-{
-    echo -e -n "-> Script checking existence of AWS security group '$SECURITY_GROUP' ... : "
-    $VERTICILA_AWS_SECGRP_SH -action check_exists -name $SECURITY_GROUP -profile $PROFILE_NAME -region $REGION >& /dev/null
-    if [ $? -eq 0 ]
-    then
-        echo -e "${GREEN}OK${NC}"
-        return
-    else
-        echo -e "${YELLOW}Does Not Exist${NC}"
-    fi
-
-    echo -e -n "-> Script creating AWS security group '$SECURITY_GROUP' ... : "
-    $VERTICILA_AWS_SECGRP_SH -action create -name $SECURITY_GROUP -profile $PROFILE_NAME -region $REGION -description "Security-group-for-Zookeeper-Ensemble" >& /dev/null
-    if [ $? -ne 0 ]
-    then
-        echo -e "${RED}Failed${NC}"
-        echo -e "${RED}ABORTING: Failed creating new security group ${NC}$SECURITY_GROUP${RED}. Script will exit.${NC}"
-        exit 1
-    else
-        echo -e "${GREEN}OK${NC}"
-    fi
-}
-
-
-createRoleForSsmIfDoesNotExist()
-{
-    # TBD
-    #### this -> aws_role.sh
-    #AWS_BUILTIN_POLICY_ARN_FOR_EC2_TO_ALLOW_SSM=arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
-    #- Create role ${AWS_RESOURCE_NAME_PREFIX}-Role-SSM-For-EC2 (if does not exist)
-    #   - Attach policy $AWS_BUILTIN_POLICY_ARN_FOR_EC2_TO_ALLOW_SSM
-    return
-}
-
-
 # Call only if "-ec2 create" is passed
 createEc2()
 {
@@ -277,16 +247,76 @@ startFirstZookeeperNodeOnEc2()
 
 main()
 {
+    local status=0
     configureGlobals
     parseAndValidateCommandLine $@
 
     if [ $ACTION == "start_first_node" ]
     then
+
+        ### Install AWS CLI if does not exist
         sys_installAwsCliIfNotPresent
-        checkExistenceOrCreateKeyPair "as per help description of -key_file"
-        createSecurityGroupIfDoesNotExist
-        # TBD: this -> aws_ebs.sh: Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
-        createRoleForSsmIfDoesNotExist
+
+
+        ### Create AWS key_pair if does not exist
+        # TBD: Take user input into $KEY_NAME and $PEM_OUT_DIR
+        echo -e -n "-> Script checking existence of aws ssh key pair '$KEY_NAME' ... : "
+        checkExistence_ofKeyPair_wKeyName $SHADOW_MODE $KEY_NAME
+        if [ $? -ne 0 ]
+        then
+            echo -e -n "-> Script creating aws ssh key pair '$KEY_NAME' ... : "
+            create_aKeyPair_wKeyName_wPemOutputDir $SHADOW_MODE $KEY_NAME $PEM_OUT_DIR
+            if [ $? -ne 0 ]
+                echo -e "${RED}ABORTING: Failed creating new key pair ${NC}$KEY_NAME${RED} and/or to store its '.pem' file at $PEM_OUT_DIR. Script will exit.${NC}"
+                exit 1
+            fi
+        fi
+
+
+        ### Create security group if does not exist
+        echo -e -n "-> Script checking existence of aws security group '$SECURITY_GROUP' ... : "
+        checkExistence_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion $SHADOW_MODE $SECURITY_GROUP $PROFILE_NAME $REGION
+        if [ $? -ne 0 ]
+        then
+            echo -e -n "-> Script creating aws security group '$SECURITY_GROUP' ... : "
+            create_aSecGrp_wSecGrpName_wDescription_wAwsProfileName_wRegion $SHADOW_MODE $SECURITY_GROUP $SECURITY_GROUP_DESC_DEFAULT $PROFILE_NAME $REGION
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}ABORTING: Failed creating new security group ${NC}$SECURITY_GROUP${RED}. Script will exit.${NC}"
+                exit 1
+            fi
+        fi
+
+
+        ### Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
+        # TBD Low priority
+
+
+        ### Create iam role if does not exist
+        # TBD: Pass absolute path of aws_policy_document__allow_ec2_to_assume_role.json into $ASSUME_ROLE_POLICY_JSON_ABS_PATH
+        # TBD: Set arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore to variable $POLICY_ARN_SSM_FOR_EC2
+        echo -e -n "-> Script checking existence of aws iam role '$ROLE_NAME' ... : "
+        checkExistence_ofRole_wRoleName $SHADOW_MODE $ROLE_NAME
+        if [ $? -ne 0 ]
+        then
+            echo -e -n "-> Script creating aws iam role '$ROLE_NAME' ... : "
+            create_aRole_wRoleName_wAssumeRolePolicyJsonAbsPath $SHADOW_MODE $ROLE_NAME $ASSUME_ROLE_POLICY_JSON_ABS_PATH
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}ABORTING: Failed creating new iam role ${NC}$ROLE_NAME${RED}. Script will exit.${NC}"
+                exit 1
+            else
+                echo -e -n "-> Script attaching policy $POLICY_ARN_SSM_FOR_EC2 to iam role '$ROLE_NAME' ... : "
+                attach_toRole_wRoleName_wPolicyArn $SHADOW_MODE $ROLE_NAME $POLICY_ARN_SSM_FOR_EC2
+                if [ $? -ne 0 ]
+                then
+                    echo -e "${RED}ABORTING: Failed attaching policy ${NC}$POLICY_ARN_SSM_FOR_EC2${RED} to iam role ${NC}$ROLE_NAME${RED}. Script will exit.${NC}"
+                    exit 1
+            fi
+        fi
+
+        ### TBD Henceforth
+
         # if "-ec2 create" is passed. Returns [ID, Public IP, Private IP]
             createEc2
         # else # -ec2 ID must have been passed
