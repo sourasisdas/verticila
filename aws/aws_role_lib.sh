@@ -1,6 +1,6 @@
 #!/bin/bash
 
-attach_toRole_wRoleName_wPolicyArn()
+attachPolicy_toRole_wRoleName_wPolicyArn()
 {
     local shadowMode=$1
     local wRoleName=$2
@@ -11,10 +11,9 @@ attach_toRole_wRoleName_wPolicyArn()
     local passMsg="attached"
     local failMsg="could_not_attach"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
 
 checkExistence_ofRole_wRoleName()
@@ -26,10 +25,9 @@ checkExistence_ofRole_wRoleName()
     local passMsg="exists"
     local failMsg="does_not_exist"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
 
 create_aRole_wRoleName_wAssumeRolePolicyJsonAbsPath()
@@ -43,8 +41,7 @@ create_aRole_wRoleName_wAssumeRolePolicyJsonAbsPath()
     local passMsg="created"
     local failMsg="could_not_create"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }

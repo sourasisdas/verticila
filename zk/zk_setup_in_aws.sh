@@ -11,7 +11,6 @@
 ### Input : 
 #            -action          start_first_node
 #            -ec2             <create|id=xxxx>
-#            -key_file        /path/to/<key_name>.pem
 #            -resource_prefix <string>
 #            -profile         <aws profile>
 #            -region          <region>
@@ -19,37 +18,48 @@
 ############### Developer modifiable Configurations #######################
 configureGlobals()
 {
+    ### setup verticila script system
     MY_ABS_PATH=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
     VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
     source $VERTICILA_HOME/sys/sys_utils.sh
     sys_setFramework
     VERTICILA_AWS_SECGRP_SH="$VERTICILA_HOME/aws/aws_secgrp.sh"
 
+    ### source verticila aws libs
     source $VERTICILA_HOME/aws/aws_ec2_lib.sh
     source $VERTICILA_HOME/aws/aws_keypair_lib.sh
     source $VERTICILA_HOME/aws/aws_secgrp_lib.sh
     source $VERTICILA_HOME/aws/aws_role_lib.sh
 
-    VERTICILA_REPO_HTTP_URL="https://github.com/sourasisdas/verticila.git"
-    VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup_aws_local.sh"
 
-    AWS_RESOURCE_NAME_PREFIX_DEFAULT="ZK"
-    SECURITY_GROUP_DEFAULT="ZK-Security-Group"
-    SECURITY_GROUP_DESC_DEFAULT="Zookeeper-Ensemble-Security-Group"
-    PROFILE_NAME_DEFAULT=$AWS_PROFILE
-    REGION_DEFAULT=ap-south-1
-
+    ### setup global variables that can be overwritten through command-line options as well
+    #TBD HIGH: Support following options in command-line
     ACTION="Invalid_Action"
+    EC2_OPTION=""
+    EC2_ID="" # No support needed in command-line - will be populated from EC2_OPTION
+    #TBD HIGH: Use AWS_RESOURCE_NAME_PREFIX before all resource name being created/checked for existence
+    AWS_RESOURCE_NAME_PREFIX="NAIRP-trial-"
+    PROFILE_NAME=$AWS_PROFILE
     HELP_MODE=0
     SHADOW_MODE=0
-    EC2_OPTION=""
-    EC2_ID=""
-    KEY_FILE=""
+    #TBD LOW: Support following options in command-line
+    REGION=ap-south-1
+    PEM_OUT_DIR="~/.ssh"
 
-    SECURITY_GROUP=$SECURITY_GROUP_DEFAULT
-    AWS_RESOURCE_NAME_PREFIX=$AWS_RESOURCE_NAME_PREFIX_DEFAULT
-    PROFILE_NAME=$PROFILE_NAME_DEFAULT
-    REGION=$REGION_DEFAULT
+    ### setup global constants etc. that should not be changed
+    ROLE_NAME="zk-ssm-role-for-ec2"
+    INSTANCE_PROFILE_NAME="zk-ssm-instprofile-for-ec2"
+    POLICY_ARN_SSM_FOR_EC2="arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    KEY_NAME="zk-ssh-key"
+    SECGRP_NAME="zk-sec-grp"
+    SECGRP_DESC="zk-ensemble-security-group"
+    ASSUME_ROLE_POLICY_JSON_ABS_PATH="$VERTICILA_HOME/aws/aws_policy_jsons/aws_policy_document__allow_ec2_to_assume_role.json"
+    AMI_ID="ami-0ebc1ac48dfd14136" # Amazon Linux 2 AMI (HVM), SSD Volume Type, 64 bit x64
+    INSTANCE_TYPE="t3.medium"
+    VERTICILA_REPO_HTTP_URL="https://github.com/sourasisdas/verticila.git"
+    VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup_aws_local.sh"    # TBD LOW: The user name "ec2-user" may vary
+
+
 }
 
 
@@ -77,13 +87,6 @@ printHelpMessage()
     echo -e "       id=xxxxxxxx : Does Zookeeper setup on existing EC2 instance with given ID."
     echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if action is start_first_node."
     echo -e
-    echo -e "${GREEN}[ -key_file /path/to/file/<key_name>.pem ]${NC}"
-    echo -e "       The <key_name> part is used to create new EC2 instances."
-    echo -e "       If the given private key file exists, creates a key-pair named <key_name> in EC2 if"
-    echo -e "       it does not exist already."
-    echo -e "       Else creates the key-pair named <key_name> in AWS and stores the private key in the"
-    echo -e "       given file."
-    echo -e "       Switch Type : ${YELLOW}Mandatory${NC} if -ec2 is given."
     echo -e
     echo -e "Use Cases:"
     echo -e "${BLUE}[ start_first_node ]${NC}"
@@ -98,7 +101,6 @@ parseAndValidateCommandLine()
 {
     hasUserProvided_action=0
     hasUserProvided_ec2=0
-    hasUserProvided_key_file=0
 
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -110,11 +112,6 @@ parseAndValidateCommandLine()
             -ec2)
                 EC2_OPTION="$2"
                 hasUserProvided_ec2=1
-                shift
-                ;;
-            -key_file)
-                KEY_FILE="$2"
-                hasUserProvided_key_file=1
                 shift
                 ;;
             -s|-shadow)
@@ -166,13 +163,6 @@ parseAndValidateCommandLine()
             echo -e "${RED}ABORTING: Unknown value ${NC}$EC2_OPTION${RED} passed to switch ${NC}-ec2${RED}. Script will exit.${NC}"
             local shouldAbort=1
         fi
-    fi
-
-    #-------- Validate -key_file
-    if [[ $hasUserProvided_ec2 == 1 && $hasUserProvided_key_file == 0 ]]
-    then
-        echo -e "${RED}ABORTING: Missing mandatory switch ${NC}-key_file${RED}. Script will exit.${NC}"
-        local shouldAbort=1
     fi
 
     #-------- Validate -h|-help (Print usage)
@@ -259,11 +249,20 @@ main()
 
 
         ### Create AWS key_pair if does not exist
-        # TBD: Take user input into $KEY_NAME and $PEM_OUT_DIR
         echo -e -n "-> Script checking existence of aws ssh key pair '$KEY_NAME' ... : "
         checkExistence_ofKeyPair_wKeyName $SHADOW_MODE $KEY_NAME
         if [ $? -ne 0 ]
         then
+            # Check existence and create $PEM_OUT_DIR, if does not exist
+            if [ ! -d $PEM_OUT_DIR ]
+            then
+                mkdir $PEM_OUT_DIR
+                if [ $? -ne 0 ]
+                then
+                    echo -e "${RED}ABORTING: Failed creating directory ${NC}$PEM_OUT_DIR${RED} to store '.pem' file. Script will exit.${NC}"
+                    exit 1
+                fi
+            fi
             echo -e -n "-> Script creating aws ssh key pair '$KEY_NAME' ... : "
             create_aKeyPair_wKeyName_wPemOutputDir $SHADOW_MODE $KEY_NAME $PEM_OUT_DIR
             if [ $? -ne 0 ]
@@ -274,27 +273,25 @@ main()
 
 
         ### Create security group if does not exist
-        echo -e -n "-> Script checking existence of aws security group '$SECURITY_GROUP' ... : "
-        checkExistence_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion $SHADOW_MODE $SECURITY_GROUP $PROFILE_NAME $REGION
+        echo -e -n "-> Script checking existence of aws security group '$SECGRP_NAME' ... : "
+        checkExistence_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion $SHADOW_MODE $SECGRP_NAME $PROFILE_NAME $REGION
         if [ $? -ne 0 ]
         then
-            echo -e -n "-> Script creating aws security group '$SECURITY_GROUP' ... : "
-            create_aSecGrp_wSecGrpName_wDescription_wAwsProfileName_wRegion $SHADOW_MODE $SECURITY_GROUP $SECURITY_GROUP_DESC_DEFAULT $PROFILE_NAME $REGION
+            echo -e -n "-> Script creating aws security group '$SECGRP_NAME' ... : "
+            create_aSecGrp_wSecGrpName_wDescription_wAwsProfileName_wRegion $SHADOW_MODE $SECGRP_NAME $SECGRP_DESC $PROFILE_NAME $REGION
             if [ $? -ne 0 ]
             then
-                echo -e "${RED}ABORTING: Failed creating new security group ${NC}$SECURITY_GROUP${RED}. Script will exit.${NC}"
+                echo -e "${RED}ABORTING: Failed creating new security group ${NC}$SECGRP_NAME${RED}. Script will exit.${NC}"
                 exit 1
             fi
         fi
 
 
         ### Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
-        # TBD Low priority
+        # TBD LOW
 
 
         ### Create iam role if does not exist
-        # TBD: Pass absolute path of aws_policy_document__allow_ec2_to_assume_role.json into $ASSUME_ROLE_POLICY_JSON_ABS_PATH
-        # TBD: Set arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore to variable $POLICY_ARN_SSM_FOR_EC2
         echo -e -n "-> Script checking existence of aws iam role '$ROLE_NAME' ... : "
         checkExistence_ofRole_wRoleName $SHADOW_MODE $ROLE_NAME
         if [ $? -ne 0 ]
@@ -305,24 +302,77 @@ main()
             then
                 echo -e "${RED}ABORTING: Failed creating new iam role ${NC}$ROLE_NAME${RED}. Script will exit.${NC}"
                 exit 1
-            else
-                echo -e -n "-> Script attaching policy $POLICY_ARN_SSM_FOR_EC2 to iam role '$ROLE_NAME' ... : "
-                attach_toRole_wRoleName_wPolicyArn $SHADOW_MODE $ROLE_NAME $POLICY_ARN_SSM_FOR_EC2
-                if [ $? -ne 0 ]
-                then
-                    echo -e "${RED}ABORTING: Failed attaching policy ${NC}$POLICY_ARN_SSM_FOR_EC2${RED} to iam role ${NC}$ROLE_NAME${RED}. Script will exit.${NC}"
-                    exit 1
+            fi
+
+            echo -e -n "-> Script attaching policy $POLICY_ARN_SSM_FOR_EC2 to iam role '$ROLE_NAME' ... : "
+            attachPolicy_toRole_wRoleName_wPolicyArn $SHADOW_MODE $ROLE_NAME $POLICY_ARN_SSM_FOR_EC2
+            if [ $? -ne 0 ]
+            then
+               echo -e "${RED}ABORTING: Failed attaching policy ${NC}$POLICY_ARN_SSM_FOR_EC2${RED} to iam role ${NC}$ROLE_NAME${RED}. Script will exit.${NC}"
+               exit 1
             fi
         fi
 
-        ### TBD Henceforth
 
-        # if "-ec2 create" is passed. Returns [ID, Public IP, Private IP]
-            createEc2
-        # else # -ec2 ID must have been passed
-            #checkStatusOfEc2Intance $EC2_ID
-            #attachRoleForSsmToEc2IfNotAttached
+        ### Create instance profile if does not exist
+        echo -e -n "-> Script checking existence of instance profile '$INSTANCE_PROFILE_NAME' ... : "
+        checkExistence_ofInstProfile_wInstProfileName $SHADOW_MODE $INSTANCE_PROFILE_NAME
+        if [ $? -ne 0 ]
+        then
+            echo -e -n "-> Script creating aws instance profile '$INSTANCE_PROFILE_NAME' ... : "
+            create_anInstProfile_wInstProfileName $SHADOW_MODE $INSTANCE_PROFILE_NAME
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}ABORTING: Failed creating new instance profile ${NC}$INSTANCE_PROFILE_NAME${RED}. Script will exit.${NC}"
+                exit 1
+            fi
+
+            echo -e -n "-> Script adding role $ROLE_NAME to instance profile '$INSTANCE_PROFILE_NAME' ... : "
+            addRole_toInstProfile_wInstProfileName_wRoleName $SHADOW_MODE $INSTANCE_PROFILE_NAME $ROLE_NAME
+            if [ $? -ne 0 ]
+            then
+               echo -e "${RED}ABORTING: Failed adding rolw ${NC}$ROLE_NAME${RED} to instance profile ${NC}$INSTANCE_PROFILE${RED}. Script will exit.${NC}"
+               exit 1
+            fi
+        fi
+
+        ### Create EC2, if "-ec2 create" is passed, else check existence of given EC2 id 
+        if [ $EC2_OPTION == "create" ]
+        then
+            echo -e -n "-> Script creating EC2 instance ... : "
+            EC2_ID=$(createAndGetId_ofEc2_wAmiId_wInstanceType_wKeyName_wSecGrpName $SHADOW_MODE $AMI_ID $INSTANCE_TYPE $KEY_NAME $SECGRP_NAME)
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}ABORTING: Failed creating new EC2 instance. Script will exit.${NC}"
+                exit 1
+            fi
+        else # "-ec2 id=*" must have been passed
+            echo -e -n "-> Script checking existence of EC2 instance with instance ID $EC2_ID ... : "
+            checkExistence_ofEc2_wInstanceId $SHADOW_MODE $EC2_ID
+            if [ $? -ne 0 ]
+            then
+                echo -e "${RED}ABORTING: EC2 instance with instance ID ${NC}$EC2_ID${RED} not found. Script will exit.${NC}"
+                exit 1
+            fi
+        fi
+
+        ### Get Arn of instance profile
+        echo -e -n "-> Script getting ARN of instance profile $INSTANCE_PROFILE_NAME ... : "
+        INSTANCE_PROFILE_ARN=$(getArn_ofInstProfile_wInstProfileName $SHADOW_MODE $INSTANCE_PROFILE_NAME)
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}ABORTING: Failed getting ARN of instance profile ${NC}$INSTANCE_PROFILE_NAME${RED}. Script will exit.${NC}"
+            exit 1
+        fi
+
+
+        ### TBD Henceforth
+            #check if ec2 instance profile exists and has this Arn
+               #if not, attach instProfile to ec2:$aws ec2 associate-iam-instance-profile --instance-id $EC2_ID --iam-instance-profile Name=$INSTANCE_PROFILE_NAME
+
             #attachSecurityGroupToEc2IfNotAttached
+
+
         addPermissionsToSecurityGroup
 
         startFirstZookeeperNodeOnEc2 "12345678890"

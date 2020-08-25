@@ -14,10 +14,9 @@ checkExistence_ofKeyPair_wKeyName()
     local passMsg="exists"
     local failMsg="does_not_exist"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
 
 create_aKeyPair_wKeyName_wPemOutputDir()
@@ -34,8 +33,7 @@ create_aKeyPair_wKeyName_wPemOutputDir()
     local passMsg="created"
     local failMsg="could_not_create"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }

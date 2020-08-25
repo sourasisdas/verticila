@@ -19,10 +19,9 @@ revokePermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wC
     local passMsg="revoked"
     local failMsg="could_not_revoke"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
 
 grantPermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wCidr()
@@ -44,10 +43,9 @@ grantPermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wCi
     local passMsg="granted"
     local failMsg="could_not_grant"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
 
 checkExistence_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion()
@@ -63,10 +61,9 @@ checkExistence_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion()
     local passMsg="exists"
     local failMsg="does_not_exist"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
 
 create_aSecGrp_wSecGrpName_wDescription_wAwsProfileName_wRegion()
@@ -83,8 +80,7 @@ create_aSecGrp_wSecGrpName_wDescription_wAwsProfileName_wRegion()
     local passMsg="created"
     local failMsg="could_not_create"
 
-    local myAbsolutePath=`echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"`
-    local verticilaHome=`dirname $myAbsolutePath | xargs dirname`
-    source $verticilaHome/aws/aws_utils.sh
-    executeAwsCommandAndExit "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
 }
