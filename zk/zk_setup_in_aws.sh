@@ -47,6 +47,7 @@ configureGlobals()
     PEM_OUT_DIR="~/.ssh"
 
     ### setup global constants etc. that should not be changed
+    MY_PUBLIC_IP="$(curl -s icanhazip.com 2> /dev/null)"
     ROLE_NAME="zk-ssm-role-for-ec2"
     INSTANCE_PROFILE_NAME="zk-ssm-instprofile-for-ec2"
     POLICY_ARN_SSM_FOR_EC2="arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -56,8 +57,10 @@ configureGlobals()
     ASSUME_ROLE_POLICY_JSON_ABS_PATH="$VERTICILA_HOME/aws/aws_policy_jsons/aws_policy_document__allow_ec2_to_assume_role.json"
     AMI_ID="ami-0ebc1ac48dfd14136" # Amazon Linux 2 AMI (HVM), SSD Volume Type, 64 bit x64
     INSTANCE_TYPE="t3.medium"
+    EC2_LOCAL_INSTALLATION_DIR="/home/ec2-user/installed_softwares/"
     VERTICILA_REPO_HTTP_URL="https://github.com/sourasisdas/verticila.git"
-    VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup_aws_local.sh"    # TBD LOW: The user name "ec2-user" may vary
+    VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH="$EC2_LOCAL_INSTALLATION_DIR/verticila/zk/zk_setup_aws_local.sh"    # TBD LOW: The user name "ec2-user" may vary
+    SSM_COMMAND_OUTPUT_S3_BUCKET_NAME=nairp-s3-bucket-auto-hosting
 
 
 }
@@ -186,53 +189,44 @@ parseAndValidateCommandLine()
 }
 
 
-# Call only if "-ec2 create" is passed
-createEc2()
-{
-    # TBD
-    #### this -> aws_ec2.sh
-    #- Create instance t3.medium (-ec2 create|ID -> either creates new ec2, or uses given ID)
-    #   - Use given key_pair
-    #   - (?) Attach EBS ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 (if -ec2 ID given, and it does not have attached EBS already)
-    #   - Attach ${AWS_RESOURCE_NAME_PREFIX}-ZK-Security-Group (if -ec2 ID given, and it does not have attached SECGRP already)
-    #   - Attach role ${AWS_RESOURCE_NAME_PREFIX}-Role-SSM-For-EC2 (if -ec2 ID given, and it does not have same role already)
-    #   - Set user data (if anything needed)
-    #   - Return its ID, public IP & private IP
-    return
-}
-
-
-addPermissionsToSecurityGroup()
-{
-    # TBD
-    #### this -> aws_secgrp.sh
-    #- Add security group permissions to ${AWS_RESOURCE_NAME_PREFIX}-ZK-Security-Group (if not already permitted)
-    #   - TCP 22, myip/32
-    #   - TCP 8080, privateIP/32 of EC2 instance just started
-    return
-}
-
 startFirstZookeeperNodeOnEc2()
 {
-    local execution_timeout=180
-    local timeout_seconds=120
-    local ec2_instance_id=$1
-    local output_s3_bucket_name=nairp-s3-bucket-auto-hosting
-    local region=ap-south-1
+    local shadowMode=$1
+    local ec2InstanceId=$2
 
-    local remote_command_to_run="\
-    mkdir -p /home/ec2-user/installed_softwares/ ; \
-    cd /home/ec2-user/installed_softwares/ ; \
-    sudo yum -y install git ; \
-    git clone https://github.com/sourasisdas/verticila.git ; \
-    $VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH -action start_first_node\
-    "
+    local startTimeout=120
+    local executionTimeout=180
+    local outputS3BucketName=$SSM_COMMAND_OUTPUT_S3_BUCKET_NAME
+    local region=$REGION
 
-    local ssm_command="aws ssm send-command --document-name "\""AWS-RunShellScript"\"" --document-version "\""1"\"" --targets '[{"\""Key"\"":"\""InstanceIds"\"","\""Values"\"":["\""$ec2_instance_id"\""]}]' --parameters '{"\""commands"\"":["\""$remote_command_to_run"\""],"\""workingDirectory"\"":["\"""\""],"\""executionTimeout"\"":["\""$execution_timeout"\""]}' --timeout-seconds $timeout_seconds --max-concurrency "\""50"\"" --max-errors "\""0"\"" --output-s3-bucket-name "\""$output_s3_bucket_name"\"" --region $region"
-    echo $ssm_command
+    ### Prepare and invoke SSM command
+    local remoteCommandToRun="mkdir -p $EC2_LOCAL_INSTALLATION_DIR ; \
+                              cd $EC2_LOCAL_INSTALLATION_DIR ; \
+                              sudo yum -y install git ; \
+                              rm -rf $VERTICILA_REPO_HTTP_URL ; \
+                              git clone $VERTICILA_REPO_HTTP_URL ; \
+                              chown -R ec2-user:ec2-user verticila ; \
+                              $VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH -action start_first_node ; \
+                             "
+    local ssmCommandStatus=$(invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion "\${shadowMode}" "\${remoteCommandToRun}" "\${ec2InstanceId}" "\${startTimeout}" "\${executionTimeout}" "\${outputS3BucketName}" "\${region}")
+    local status=$?
 
-#    aws ssm send-command --document-name "AWS-RunShellScript" --document-version "1" --targets '[{"Key":"InstanceIds","Values":["i-05ed6cada2f61563c"]}]' --parameters '{"commands":["/home/ec2-user/x.sh sou_ssm_dir \"1.2.3.4|5.6.7.8=9\""],"workingDirectory":[""],"executionTimeout":["3600"]}' --timeout-seconds 600 --max-concurrency "50" --max-errors "0" --output-s3-bucket-name "nairp-s3-bucket-auto-hosting" --region ap-south-1
+    if [ $status -ne 0 ]
+    then
+        echo "ssm_command_invocation_failed"
+        return $status
+    fi
+
+
+    ### Let SSM command execution finish, and get back status of it
+    local totalTimeout=$(( $startTimeout + $executionTimeout ))
+    local ssmCommandStatus=$(waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait "\${shadowMode}" "\${ssmCommandId}" "\${ec2InstanceId}" "\${totalTimeout}")
+    status=$?
+
+    echo $ssmCommandStatus
+    return $status
 }
+
 
 
 main()
@@ -289,9 +283,11 @@ main()
 
         ### Create EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 for EC2 ? (if does not exist)
         # TBD LOW
+        ### Attach EBS volume ${AWS_RESOURCE_NAME_PREFIX}-ZK-EBS-1 (if -ec2 ID given, and it does not have attached EBS already)
+        # TBD LOW
 
 
-        ### Create iam role if does not exist
+        ### Create iam role if does not exist, and attach policy
         echo -e -n "-> Script checking existence of aws iam role '$ROLE_NAME' ... : "
         checkExistence_ofRole_wRoleName $SHADOW_MODE $ROLE_NAME
         if [ $? -ne 0 ]
@@ -314,7 +310,7 @@ main()
         fi
 
 
-        ### Create instance profile if does not exist
+        ### Create instance profile if does not exist, and add role
         echo -e -n "-> Script checking existence of instance profile '$INSTANCE_PROFILE_NAME' ... : "
         checkExistence_ofInstProfile_wInstProfileName $SHADOW_MODE $INSTANCE_PROFILE_NAME
         if [ $? -ne 0 ]
@@ -336,11 +332,12 @@ main()
             fi
         fi
 
+
         ### Create EC2, if "-ec2 create" is passed, else check existence of given EC2 id 
         if [ $EC2_OPTION == "create" ]
         then
             echo -e -n "-> Script creating EC2 instance ... : "
-            EC2_ID=$(createAndGetId_ofEc2_wAmiId_wInstanceType_wKeyName_wSecGrpName $SHADOW_MODE $AMI_ID $INSTANCE_TYPE $KEY_NAME $SECGRP_NAME)
+            EC2_ID=$(createAndGetId_ofEc2_wAmiId_wInstType_wKeyName_wSecGrpName $SHADOW_MODE $AMI_ID $INSTANCE_TYPE $KEY_NAME $SECGRP_NAME)
             if [ $? -ne 0 ]
             then
                 echo -e "${RED}ABORTING: Failed creating new EC2 instance. Script will exit.${NC}"
@@ -348,7 +345,7 @@ main()
             fi
         else # "-ec2 id=*" must have been passed
             echo -e -n "-> Script checking existence of EC2 instance with instance ID $EC2_ID ... : "
-            checkExistence_ofEc2_wInstanceId $SHADOW_MODE $EC2_ID
+            checkExistence_ofEc2_wInstId $SHADOW_MODE $EC2_ID
             if [ $? -ne 0 ]
             then
                 echo -e "${RED}ABORTING: EC2 instance with instance ID ${NC}$EC2_ID${RED} not found. Script will exit.${NC}"
@@ -356,9 +353,14 @@ main()
             fi
         fi
 
+
+        ### Set user data to EC2, if required
+        # TBD LOW
+
+
         ### Get Arn of instance profile
         echo -e -n "-> Script getting ARN of instance profile $INSTANCE_PROFILE_NAME ... : "
-        INSTANCE_PROFILE_ARN=$(getArn_ofInstProfile_wInstProfileName $SHADOW_MODE $INSTANCE_PROFILE_NAME)
+        INSTANCE_PROFILE_ARN=$(getArn_ofInstProfile_wInstProfileName "\${SHADOW_MODE}" "\${INSTANCE_PROFILE_NAME}")
         if [ $? -ne 0 ]
         then
             echo -e "${RED}ABORTING: Failed getting ARN of instance profile ${NC}$INSTANCE_PROFILE_NAME${RED}. Script will exit.${NC}"
@@ -366,24 +368,72 @@ main()
         fi
 
 
-        ### TBD Henceforth
-            #check if ec2 instance profile exists and has this Arn
-               #if not, attach instProfile to ec2:$aws ec2 associate-iam-instance-profile --instance-id $EC2_ID --iam-instance-profile Name=$INSTANCE_PROFILE_NAME
+        ### Attach instance profile to EC2, if not already attached
+        echo -e -n "-> Script getting ARN of EC2 instance with instance ID $EC2_ID ... : "
+        EC2_INSTANCE_PROFILE_ARN=$(getInstProfileArn_ofEc2_wInstId "\${SHADOW_MODE}" "\${EC2_ID}")
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}ABORTING: Failed getting ARN of instance profile ${NC}$INSTANCE_PROFILE_NAME${RED}. Script will exit.${NC}"
+            exit 1
+        else
+            if [ $EC2_INSTANCE_PROFILE_ARN == "failed" ] # No profile attached, so just attach $INSTANCE_PROFILE_ARN
+            then
+                echo -e -n "-> Script associating instance profile $INSTANCE_PROFILE_NAME to EC2 instance with instance ID $EC2_ID ... : "
+                associateInstProfile_toEc2_wInstId_wInstProfileName $SHADOW_MODE $EC2_ID $INSTANCE_PROFILE_NAME
+                if [ $? -ne 0 ]
+                then
+                    echo -e "${RED}ABORTING: Failed associating instance profile ${NC}$INSTANCE_PROFILE_NAME${RED} to EC2 instance with instance ID ${NC}$EC2_ID${RED}. Script will exit.${NC}"
+                    exit 1
+                fi
+            elif [ $EC2_INSTANCE_PROFILE_ARN != $INSTANCE_PROFILE_ARN ] # Some other profile attached, hence abort to not mess with the existing roles of the EC2
+                echo -e "${RED}ABORTING: EC2 instance ${NC}$EC2_ID${RED} is already associated with an instance profile ${NC}$EC2_INSTANCE_PROFILE_ARN${RED}. To avoid messing with the roles currently assumed by the EC2, the script did not change the ec2's association to the new instance profile ${NC}$INSTANCE_PROFILE_ARN${RED}, as required. Script will exit. To use the EC2 instance, please replace its instance profile manually from AWS console.${NC}"
+                exit 1
+            else # Required role already associated, so nothing to do
+                :
+            fi
+        fi
 
-            #attachSecurityGroupToEc2IfNotAttached
+
+        ### Grant the security group inbound permission for SSH (tcp/22) to my IP
+        echo -e -n "-> Script granting inbound SSH permission of my public IP $MY_PUBLIC_IP to security group $SECGRP_NAME ... : "
+        grantPermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wCidr $SHADOW_MODE $SECGRP_NAME $PROFILE_NAME $REGION tcp 22 "$MY_PUBLIC_IP/32"
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}ABORTING: Failed granting inbound SSH permission of my public IP ${NC}$MY_PUBLIC_IP${RED} to security group ${NC}$SECGRP_NAME${RED}. Script will exit.${NC}"
+            exit 1
+        fi
+
+        ### Get private IP address of EC2 instance $EC2_ID
+        echo -e -n "-> Script getting private IPv4 address of EC2 instance with instance ID $EC2_ID ... : "
+        EC2_PRIVATE_IP=$(getPublicIpv4_ofEc2_wInstId "\${SHADOW_MODE}" "\${EC2_ID}" )
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}ABORTING: Failed getting private IPv4 address of EC2 instance with instance ID ${NC}$EC2_ID${RED}. Script will exit.${NC}"
+            exit 1
+        fi
+
+        ### Grant the security group inbound permission for HTTP (tcp/8080) to the private IP of instance $EC2_ID. This is needed for a single security group to be shared within a Zookeeper cluster of many EC2 instances
+        echo -e -n "-> Script granting inbound HTTP permission of EC2 instance's private IP $EC2_PRIVATE_IP to security group $SECGRP_NAME ... : "
+        grantPermission_ofSecGrp_wSecGrpName_wAwsProfileName_wRegion_wProtocol_wPort_wCidr $SHADOW_MODE $SECGRP_NAME $PROFILE_NAME $REGION tcp 8080 "$EC2_PRIVATE_IP/32"
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}ABORTING: Failed granting inbound HTTP permission of EC2 instance's private IP ${NC}$EC2_PRIVATE_IP${RED} to security group ${NC}$SECGRP_NAME${RED}. Script will exit.${NC}"
+            exit 1
+        fi
 
 
-        addPermissionsToSecurityGroup
-
-        startFirstZookeeperNodeOnEc2 "12345678890"
-        #busyWaitForCompletion (aws ssm list-command-invocations --command-id 302c76a3-2212-4b50-957e-b10a17974e76)
-        # If successful
-        #    echo "0 $Ec2ID $Ec2PublicIP $Ec2PrivateIP"
-        #    exit 0
-        # Else
-        #    Terminate EC2 if created, or, stop EC2 if started.
-        #    echo "1"
-        #    exit 1
+        echo -e -n "-> Script starting first Zookeeper node on EC2 with instance ID $EC2_ID ... : "
+        local ssmCommandId=$(startFirstZookeeperNodeOnEc2 "\${SHADOW_MODE}" "\${EC2_ID}" )
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}ABORTING: Failed starting first Zookeeper node on EC2 instance ID ${NC}$EC2_ID${RED} due to failed/incomplete SSM command. To debug, look into SSM command history from AWS console. Script will exit.${NC}"
+            echo "1"
+            exit 1
+        else
+            # TBD HIGH: Terminate EC2 if created, or, stop EC2 if started.
+            echo "$EC2_ID"
+            exit 0
+        fi
     fi
 }
 
