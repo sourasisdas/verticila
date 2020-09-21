@@ -279,6 +279,7 @@ startFirstZookeeperNodeOnEc2()
 
     ### Prepare and invoke SSM command
     local remoteCommandToRun="mkdir -p $EC2_LOCAL_INSTALLATION_DIR ; \
+                              chown -R ec2-user:ec2-user $EC2_LOCAL_INSTALLATION_DIR ; \
                               cd $EC2_LOCAL_INSTALLATION_DIR ; \
                               sudo yum -y install git ; \
                               rm -rf $EC2_LOCAL_INSTALLATION_VERTICILA ; \

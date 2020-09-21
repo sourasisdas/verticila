@@ -13,6 +13,7 @@ configureGlobals()
     VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
     source $VERTICILA_HOME/sys/sys_utils.sh
     sys_setFramework
+    INSTALL_HOME=$HOME/installed_softwares/
 
     #-------- Zookeeper download settings
     ZK_VERSION="zookeeper-3.6.2"
