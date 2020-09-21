@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 ###########################################################################
 # ABOUT: This script can be used for distributed setup of Ensembled       #
