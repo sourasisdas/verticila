@@ -455,7 +455,7 @@ checkForRequiredPackages()
         requiredPackagesArr+=('java=openjdk-8-jdk')    # package_binary_name = package_release_name
     else # $OS == RHEL
         requiredPackagesArr+=('sha512sum')
-        requiredPackagesArr+=('java-1.8.0-openjdk-devel')
+        requiredPackagesArr+=('java=java-1.8.0-openjdk-devel')
     fi
     
     missingPackagesArr=()
@@ -511,7 +511,7 @@ installMissingPackages()
     
     #-------- Modify installer to add special terms to it
     TEMP_INSTALLER=$INSTALLER
-    if [ $OS == "UBUNTU" ]
+    if [ $OS != "MAC" ]
     then
         TEMP_INSTALLER="sudo $TEMP_INSTALLER -y"
     fi

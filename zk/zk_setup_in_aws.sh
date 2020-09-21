@@ -48,7 +48,6 @@ configureGlobals()
     PEM_OUT_DIR="$HOME/.ssh"
 
     ### setup global constants etc. that should not be changed
-    MY_PUBLIC_IP="$(curl -s icanhazip.com 2> /dev/null)"
     WAIT_SECONDS_BEFORE_NEW_EC2_INSTANCE_RUNS=30
     EC2_NAME_TAG="zk-ec2" # Its value will be populated based on "action"
     ROLE_NAME="zk-ssm-role-for-ec2"
@@ -130,10 +129,13 @@ printHelpMessage()
     echo -e "       Default     : $PEM_OUT_DIR [ \$HOME/.ssh ]"
     echo -e "       Switch Type : ${YELLOW}Optional${NC}."
     echo -e
+    echo -e "${GREEN}[ -my_ip <My machine's IPV4 address>]"${NC}
+    echo -e "       Allows given IPV4 address to SSH into AWS EC2 that will be setup."
+    echo -e
     echo -e "Use Cases:"
     echo -e "${BLUE}[ start_first_node ]${NC}"
-    echo -e "$SCRIPT_BASE_NAME -action start_first_node -ec2 create     -aws_resource_prefix R [-profile P] [-region R] [-pem_out_dir D]"
-    echo -e "$SCRIPT_BASE_NAME -action start_first_node -ec2 id=xxxxxxx -aws_resource_prefix R [-profile P] [-region R] [-pem_out_dir D]"
+    echo -e "$SCRIPT_BASE_NAME -action start_first_node -ec2 create     -aws_resource_prefix R [-profile P] [-region R] [-pem_out_dir D] [-my_ip I]"
+    echo -e "$SCRIPT_BASE_NAME -action start_first_node -ec2 id=xxxxxxx -aws_resource_prefix R [-profile P] [-region R] [-pem_out_dir D] [-my_ip I]"
     echo -e "---------------------------------------------------------------"
 }
 
@@ -144,6 +146,7 @@ parseAndValidateCommandLine()
     hasUserProvided_action=0
     hasUserProvided_ec2=0
     hasUserProvided_aws_resource_prefix=0
+    hasUserProvidedMyIp=0
 
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -168,6 +171,10 @@ parseAndValidateCommandLine()
                 hasUserProvided_aws_resource_prefix=1
                 shift
                 ;;
+            -my_ip)
+                MY_PUBLIC_IP="$2"
+                hasUserProvidedMyIp=1
+                shift;;
             -s|-shadow)
                 SHADOW_MODE=1
                 ;;
@@ -190,6 +197,13 @@ parseAndValidateCommandLine()
     fi
 
     local shouldAbort=0
+
+    #-------- Validate -my_ip
+    if [ $hasUserProvidedMyIp == 0 ]
+    then
+        MY_PUBLIC_IP="$(curl -s icanhazip.com 2> /dev/null)"
+    fi
+
 
     #-------- Validate -action
     if [ $hasUserProvided_action == 0 ]
