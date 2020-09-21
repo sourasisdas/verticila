@@ -15,7 +15,7 @@ configureGlobals()
     sys_setFramework
 
     #-------- Zookeeper download settings
-    ZK_VERSION="zookeeper-3.6.1"
+    ZK_VERSION="zookeeper-3.6.2"
     ZK_BIN_NAME=apache-$ZK_VERSION-bin
     ZK_BIN_NAME_TAR=$ZK_BIN_NAME.tar.gz
     ZK_BIN_NAME_SHA=$ZK_BIN_NAME_TAR.sha512
