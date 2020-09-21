@@ -1,5 +1,11 @@
 #!/bin/bash
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
 executeAwsCommand()
 {
     eval shadowMode="$1"
@@ -34,9 +40,9 @@ executeAwsCommand()
 
         if [ $status -eq 0 ]
         then
-            echo $passMsg
+            echo -e ${GREEN}$passMsg${NC}
         else
-            echo $failMsg
+            echo -e ${RED}$failMsg${NC}
         fi
     else
         echo $trimmedCommandString
@@ -79,10 +85,11 @@ executeAwsCommandAndEchoReturnValue()
 
     local trimmedCommandString="$(sed -e 's/[[:space:]]*$/ /' <<<${commandString})"
     local status=0
+    local retVal=""
+    local outStream="/dev/null"
     
     if [ $shadowMode -eq 0 ]
     then
-        local outStream="/dev/null"
         if [[ ! -z "${VERTICILA_LOG_FILE_NAME}" ]]
         then
             mkdir -p ~/.verticila/
@@ -98,17 +105,17 @@ executeAwsCommandAndEchoReturnValue()
             echo "################ $trimmedCommandString" >> $outStream 2>&1
         fi
 
-        local retVal=`$trimmedCommandString`
+        retVal=`eval $trimmedCommandString`
         status=$?
         if [ $status -ne 0 ]
         then
             retVal="failed"
         fi
-        echo "$retVal" >> $outStream 2>&1
-        echo $retVal
     else
-        echo $trimmedCommandString
+        retVal=$trimmedCommandString
     fi
+    echo $retVal >> $outStream 2>&1
+    echo $retVal
     return $status
 }
 
@@ -122,7 +129,7 @@ executeRemoteSsmCommandAndEchoReturnValue()
     eval outputS3BucketName="$6"
     eval region="$7"
 
-    local commandString=="aws ssm send-command --document-name "\""AWS-RunShellScript"\"" --document-version "\""1"\"" --targets '[{"\""Key"\"":"\""InstanceIds"\"","\""Values"\"":["\""$ec2InstanceId"\""]}]' --parameters '{"\""commands"\"":["\""$remoteCommandToRun"\""],"\""workingDirectory"\"":["\"""\""],"\""executionTimeout"\"":["\""$executionTimeout"\""]}' --timeout-seconds $startTimeout --max-concurrency "\""50"\"" --max-errors "\""0"\"" --output-s3-bucket-name "\""$outputS3BucketName"\"" --region $region" --query "Command.CommandId" --output text
+    local commandString="aws ssm send-command --document-name "\""AWS-RunShellScript"\"" --document-version "\""1"\"" --targets '[{"\""Key"\"":"\""InstanceIds"\"","\""Values"\"":["\""$ec2InstanceId"\""]}]' --parameters '{"\""commands"\"":["\""$remoteCommandToRun"\""],"\""workingDirectory"\"":["\""/home/ec2-user"\""],"\""executionTimeout"\"":["\""$executionTimeout"\""]}' --timeout-seconds $startTimeout --max-concurrency "\""50"\"" --max-errors "\""0"\"" --output-s3-bucket-name "\""$outputS3BucketName"\"" --region $region --query 'Command.CommandId' --output text"
 
     local trimmedCommandString="$(sed -e 's/[[:space:]]*$/ /' <<<${commandString})"
     local status=0
@@ -145,7 +152,7 @@ executeRemoteSsmCommandAndEchoReturnValue()
             echo "################ $trimmedCommandString" >> $outStream 2>&1
         fi
 
-        local retVal=`$trimmedCommandString`
+        local retVal=`eval $trimmedCommandString`
         status=$?
         if [ $status -ne 0 ]
         then

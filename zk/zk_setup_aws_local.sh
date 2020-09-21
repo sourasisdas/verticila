@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 ###########################################
 #### This script manages (starting/stopping etc.) of Zookeeper server node in a multiserver settings.
@@ -33,14 +33,14 @@ printHelpMessage()
     echo -e "${GREEN}[ -h | -help ]"${NC}
     echo -e "       Shows help message and exits."
     echo -e
-    echo -e "${GREEN}[ -action <start_first> ]${NC}"
+    echo -e "${GREEN}[ -action <start_first_node> ]${NC}"
     echo -e "       Performs the action."
-    echo -e "       start_first : Starts the first Zookeeper node in a multiserver settings."
+    echo -e "       start_first_node : Starts the first Zookeeper node in a multiserver settings."
     echo -e "       Switch Type : ${YELLOW}Mandatory${NC}"
     echo -e
     echo -e "Use Cases:"
-    echo -e "${BLUE}[ start_first ]${NC}"
-    echo -e "$SCRIPT_BASE_NAME -action start_first"
+    echo -e "${BLUE}[ start_first_node ]${NC}"
+    echo -e "$SCRIPT_BASE_NAME -action start_first_node"
     echo -e "---------------------------------------------------------------"
 }
 
@@ -75,7 +75,7 @@ parseAndValidateCommandLine()
         local shouldAbort=1
     else
         case $ACTION in
-            start_first)
+            start_first_node)
                 ;;
             *)
                 echo -e "${RED}ABORTING: Unknown value ${NC}$ACTION${RED} passed to switch ${NC}-action${RED}. Script will exit.${NC}"
@@ -104,7 +104,7 @@ startFirstZookeeperNode()
 {
     $VERTICILA_EC2_ZK_SETUP_SH -action zk_install -zk_install_mode multi_server -zk_node_count 1 -zk_node_id 1 -zk_node_ip $MY_PRIVATE_IP
     $VERTICILA_EC2_ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_start
-    $VERTICILA_EC2_ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_status | gre    p leader >& /dev/null
+    $VERTICILA_EC2_ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_status | grep leader >& /dev/null
     exit $?
 }
 
@@ -113,7 +113,7 @@ main()
     configureGlobals
     parseAndValidateCommandLine $@
     case $ACTION in
-        start_first)
+        start_first_node)
             startFirstZookeeperNode
             ;;
         *)

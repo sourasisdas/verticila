@@ -1,0 +1,12 @@
+{
+    "Version": "2012-10-17",
+    "Statement":
+        {
+            "Effect": "Allow",
+            "Action": "ec2-instance-connect:SendSSHPublicKey",
+            "Resource": [
+                "arn:aws:ec2:TBD_REGION:TBD_AWS_ACCOUNT_ID:instance/*"
+            ]
+        }
+    ]
+}

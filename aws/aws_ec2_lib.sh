@@ -5,11 +5,38 @@
 
 # Given instance, enquire its EBS volume (create and use code from aws_ebs.sh) size/type etc.
 
-# Create tags
-#aws ec2 create-tags --resources i-5203422c --tags Key=Name,Value=MyInstance
 
 # Get instanceId by filter on specific attributes
 #aws ec2 describe-instances --filters "Name=instance-type,Values=t2.micro" --query "Reservations[].Instances[].InstanceId"
+
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+# Create tags
+#aws ec2 create-tags --resources i-5203422c --tags Key=Name,Value=MyInstance
+
+
+addName_toEc2_wInstId_wName()
+{
+    local shadowMode=$1
+    local wInstId=$2
+    local wName=$3
+
+    local commandString="aws ec2 create-tags \
+                         --resources $wInstId \
+                         --tags Key=Name,Value=$wName"
+    local passMsg="added"
+    local failMsg="could_not_add"
+
+    source $VERTICILA_HOME/aws/aws_utils.sh
+    executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
+    return $?
+}
+
 
 checkExistence_ofEc2_wInstId()
 {
@@ -30,11 +57,12 @@ checkExistence_ofEc2_wInstId()
 
 createAndGetId_ofEc2_wAmiId_wInstType_wKeyName_wSecGrpName()
 {
-    local shadowMode=$1
-    local wAmiId=$2
-    local wInstType=$3
-    local wKeyName=$4
-    local wSecGrpName=$5
+    local scriptMode=$1
+    local shadowMode=$2
+    local wAmiId=$3
+    local wInstType=$4
+    local wKeyName=$5
+    local wSecGrpName=$6
 
     local commandString="aws ec2 run-instances \
                          --image-id $wAmiId \
@@ -46,11 +74,19 @@ createAndGetId_ofEc2_wAmiId_wInstType_wKeyName_wSecGrpName()
                          --output text"
 
     source $VERTICILA_HOME/aws/aws_utils.sh
-    #local isNumber="$(sys_checkIfNonNegativeInteger $1)"
     local instance_id=$(executeAwsCommandAndEchoReturnValue "\${shadowMode}" "\${commandString}")
     local status=$?
+    if [ $scriptMode -eq 0 ]
+    then
+        if [ $status -eq 0 ]
+        then
+            echo -e "${GREEN}created $instance_id${NC}"
+        else
+            echo -e "${RED}could_not_create${NC}"
+        fi
+    fi
     echo $instance_id
-    return $?
+    return $status
 }
 
 
@@ -78,13 +114,13 @@ create_anEc2_wAmiId_wInstType_wKeyName_wSecGrpName()
     if [ $status -eq 0 ]
     then
         local instanceId=`cat ~/.verticila/$logFileName | jq -r '.Reservations[].Instances[].InstanceId'`
-        echo instance_id $instanceId
+        echo -e ${GREEN}instance_id $instanceId${NC}
 
         local privateIp=`cat ~/.verticila/$logFileName | jq -r '.Reservations[].Instances[].PrivateIpAddress'`
-        echo private_ip $privateIp
+        echo -e ${GREEN}private_ip $privateIp${NC}
 
         local publicIp=`cat ~/.verticila/$logFileName | jq -r '.Reservations[].Instances[].PublicIpAddress'`
-        echo public_ip $publicIp
+        echo -e ${GREEN}public_ip $publicIp${NC}
     fi
 
     return $status
@@ -92,8 +128,9 @@ create_anEc2_wAmiId_wInstType_wKeyName_wSecGrpName()
 
 getInstProfileArn_ofEc2_wInstId()
 {
-    local shadowMode=$1
-    local wInstId=$2
+    local scriptMode=$1
+    local shadowMode=$2
+    local wInstId=$3
 
     local commandString="aws ec2 describe-instances \
                          --instance-ids $wInstId \

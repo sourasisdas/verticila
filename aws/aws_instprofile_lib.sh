@@ -1,5 +1,11 @@
 #!/bin/bash
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
 checkExistence_ofInstProfile_wInstProfileName()
 {
     local shadowMode=$1
@@ -46,8 +52,9 @@ addRole_toInstProfile_wInstProfileName_wRoleName()
 
 getArn_ofInstProfile_wInstProfileName()
 {
-    local shadowMode=$1
-    local wInstProfileName=$2
+    local scriptMode=$1
+    local shadowMode=$2
+    local wInstProfileName=$3
     local commandString="aws iam get-instance-profile \
                          --instance-profile-name $wInstProfileName \
                          --query 'InstanceProfile.Arn' \
@@ -57,5 +64,5 @@ getArn_ofInstProfile_wInstProfileName()
     local arn=$(executeAwsCommandAndEchoReturnValue "\${shadowMode}" "\${commandString}")
     local status=$?
     echo $arn
-    return $?
+    return $status
 }

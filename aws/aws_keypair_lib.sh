@@ -1,5 +1,11 @@
 #!/bin/bash
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
 ###########################################################################
 # ABOUT: Library routines on AWS key-pair.                                #
 ###########################################################################
@@ -35,5 +41,10 @@ create_aKeyPair_wKeyName_wPemOutputDir()
 
     source $VERTICILA_HOME/aws/aws_utils.sh
     executeAwsCommand "\${shadowMode}" "\${commandString}" "\${passMsg}" "\${failMsg}"
-    return $?
+    local status=$?
+    if [ $status -eq 0 ]
+    then
+        chmod 400 $pemOutDir/$keyName.pem
+    fi
+    return $status
 }
