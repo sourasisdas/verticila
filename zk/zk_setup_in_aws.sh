@@ -166,6 +166,9 @@ parseAndValidateCommandLine()
             -region)
                 REGION="$2"
                 shift ;;
+            -pem_out_dir)
+                PEM_OUT_DIR="$2"
+                shift ;;
             -aws_resource_prefix)
                 AWS_RESOURCE_PREFIX="$2"
                 hasUserProvided_aws_resource_prefix=1

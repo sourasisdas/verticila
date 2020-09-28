@@ -16,6 +16,7 @@ configureGlobals()
     sys_setFramework
 
 
+    EC2_LOCAL_INSTALLATION_DIR="/home/ec2-user/installed_softwares"
     VERTICILA_EC2_ZK_SETUP_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup.sh"
     MY_PRIVATE_IP=`curl -s http://169.254.169.254/latest/meta-data/local-ipv4`
 
@@ -102,9 +103,9 @@ parseAndValidateCommandLine()
 
 startFirstZookeeperNode()
 {
-    $VERTICILA_EC2_ZK_SETUP_SH -action zk_install -zk_install_mode multi_server -zk_node_count 1 -zk_node_id 1 -zk_node_ip $MY_PRIVATE_IP
-    $VERTICILA_EC2_ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_start
-    $VERTICILA_EC2_ZK_SETUP_SH -zk_install_mode multi_server -zk_node_count 1 -action zk_status | grep leader >& /dev/null
+    bash $VERTICILA_EC2_ZK_SETUP_SH -install_home $EC2_LOCAL_INSTALLATION_DIR -action zk_install -zk_install_mode multi_server -zk_node_count 1 -zk_node_id 1 -zk_node_ip $MY_PRIVATE_IP
+    bash $VERTICILA_EC2_ZK_SETUP_SH -install_home $EC2_LOCAL_INSTALLATION_DIR -zk_install_mode multi_server -zk_node_count 1 -action zk_start
+    bash $VERTICILA_EC2_ZK_SETUP_SH -install_home $EC2_LOCAL_INSTALLATION_DIR -zk_install_mode multi_server -zk_node_count 1 -action zk_status | grep leader >& /dev/null
     exit $?
 }
 

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 ###########################################################################
 # ABOUT: This script can be used for distributed setup of Ensembled       #
@@ -13,7 +13,10 @@ configureGlobals()
     VERTICILA_HOME=`dirname $MY_ABS_PATH | xargs dirname`
     source $VERTICILA_HOME/sys/sys_utils.sh
     sys_setFramework
-    INSTALL_HOME=$HOME/installed_softwares/
+
+    #-------- Default install path
+    INSTALL_DEFAULT_PATH=$HOME/installed_softwares/
+    INSTALL_HOME=$INSTALL_DEFAULT_PATH
 
     #-------- Zookeeper download settings
     ZK_VERSION="zookeeper-3.6.2"
@@ -27,16 +30,8 @@ configureGlobals()
     ZK_ASC_DOWNLOAD_LINK=$ZK_DOWNLOAD_LINK/$ZK_BIN_NAME_ASC
 
 
-    #-------- Zookeeper install settings
-    ZK_INSTALL_PATH=$INSTALL_HOME/zookeeper
-    ZK_INSTALL_BIN_PATH=$ZK_INSTALL_PATH/$ZK_BIN_NAME
-    ZK_CONFIG_PATH=$ZK_INSTALL_BIN_PATH/conf
-
-
     #-------- Zookeeper configuration settings
     ZK_CONFIG_FILE_NAME_PREFIX="zoo_nairp"
-    ZK_DATADIR_BASE=$ZK_INSTALL_PATH/nairp_zookeeper_datadir
-    ZK_LOGFILES_DIR=$ZK_INSTALL_PATH/nairp_zookeeper_logfiles
     ZK_TICKTIME=2000
     ZK_INITLIMIT=5
     ZK_SYNCLIMIT=2
@@ -69,9 +64,6 @@ configureGlobals()
     SL_ASC_DOWNLOAD_LINK=$SL_DOWNLOAD_LINK/$SL_BIN_NAME_ASC
 
 
-    #-------- Solr install settings
-    SL_INSTALL_PATH=$INSTALL_HOME/solr
-    SL_INSTALL_BIN_PATH=$SL_INSTALL_PATH/$ZK_BIN_NAME
 
 
     #-------- Pre-parsing initializations
@@ -85,6 +77,22 @@ configureGlobals()
     ZK_NODE_IP=$ZK_NODE_IP_DEFAULT
     ZK_ALL_NODE_IP_STR=$ZK_NODE_IP
 }
+
+configureInstallationPaths()
+{
+    #-------- Zookeeper install paths
+    ZK_INSTALL_PATH=$INSTALL_HOME/zookeeper
+    ZK_INSTALL_BIN_PATH=$ZK_INSTALL_PATH/$ZK_BIN_NAME
+    ZK_CONFIG_PATH=$ZK_INSTALL_BIN_PATH/conf
+    ZK_DATADIR_BASE_PATH=$ZK_INSTALL_PATH/nairp_zookeeper_datadir
+    ZK_LOGFILES_DIR_PATH=$ZK_INSTALL_PATH/nairp_zookeeper_logfiles
+
+    #-------- Solr install paths
+    SL_INSTALL_PATH=$INSTALL_HOME/solr
+    SL_INSTALL_BIN_PATH=$SL_INSTALL_PATH/$ZK_BIN_NAME
+}
+
+
 ###########################################################################
 
 getIpsIfValidIpv4String()
@@ -165,6 +173,11 @@ parseAndValidateCommandLine()
             -zk_all_node_ip)
                 ZK_ALL_NODE_IP_STR=$2
                 hasUserProvided_zk_all_node_ip=1
+                shift
+                ;;
+            -install_home)
+                INSTALL_HOME="$2"
+                configureInstallationPaths
                 shift
                 ;;
             -h|-help)
@@ -412,20 +425,27 @@ parseAndValidateCommandLine()
         echo -e "                    : ${YELLOW}Must be skipped${NC} otherwise, in which case the value of -zk_node_ip"
         echo -e "                      will be used by script."
         echo -e
+        echo -e "${GREEN}[ -install_home <Path to installation directory> ]${NC}"
+        echo -e "       Zookeepr/Solr will be installed and respective configurations will be stored at given path."
+        echo -e "       Switch Type  : ${YELLOW}Mandatory${NC} if Zookeeper/Solr installation path is not (or, not to"
+        echo -e "                      be) same as default value. If installation of Zookeeper/Solr was done in some"
+        echo -e "                      other directory than the default value, then subsequent maintenance commands"
+        echo -e "                      must provide the directory path through this switch."
+        echo -e "       Default      : $INSTALL_DEFAULT_PATH"
         echo -e
         echo -e "Use Cases:"
         echo -e "${BLUE}[ zk_install : multi_server ]${NC}"
-        echo -e "$0 -action zk_install -zk_install_mode multi_server -zk_node_count 5 -zk_node_id 4 -zk_node_ip 13.14.15.16 -zk_all_node_ip "\""1.2.3.4|5.6.7.8|9.10.11.12|13.14.15.16|17.18.19.20"\"""
+        echo -e "$0 -action zk_install -zk_install_mode multi_server -zk_node_count 5 -zk_node_id 4 -zk_node_ip 13.14.15.16 -zk_all_node_ip "\""1.2.3.4|5.6.7.8|9.10.11.12|13.14.15.16|17.18.19.20"\"" [ -install_home D ]"
         echo -e "${BLUE}[ zk_install : single_server ]${NC}"
-        echo -e "$0 -action zk_install [ -zk_node_count 5 ] [ -zk_node_ip 1.2.3.4 ]"
+        echo -e "$0 -action zk_install [ -zk_node_count 5 ] [ -zk_node_ip 1.2.3.4 ] [ -install_home D ]"
         echo -e "${BLUE}[ zk_start | zk_stop | zk_status : multi_server ]${NC}"
-        echo -e "$0 -action zk_start  -zk_install_mode multi_server"
-        echo -e "$0 -action zk_stop   -zk_install_mode multi_server"
-        echo -e "$0 -action zk_status -zk_install_mode multi_server"
+        echo -e "$0 -action zk_start  -zk_install_mode multi_server [ -install_home D ]"
+        echo -e "$0 -action zk_stop   -zk_install_mode multi_server [ -install_home D ]"
+        echo -e "$0 -action zk_status -zk_install_mode multi_server [ -install_home D ]"
         echo -e "${BLUE}[ zk_start | zk_stop | zk_status : single_server ]${NC}"
-        echo -e "$0 -action zk_start  [ -zk_node_count 5 ]"
-        echo -e "$0 -action zk_stop   [ -zk_node_count 5 ]"
-        echo -e "$0 -action zk_status [ -zk_node_count 5 ]"
+        echo -e "$0 -action zk_start  [ -zk_node_count 5 ] [ -install_home D ]"
+        echo -e "$0 -action zk_stop   [ -zk_node_count 5 ] [ -install_home D ]"
+        echo -e "$0 -action zk_status [ -zk_node_count 5 ] [ -install_home D ]"
         echo -e "---------------------------------------------------------------"
         local shouldAbort=1
     fi
@@ -546,7 +566,16 @@ installMissingPackages()
 downloadAndValidateZookeeper()
 {
     #-------- Prepare Zookeeper installation directory
+    echo -e -n "-> Setting up installation home ... : "
     mkdir -p $INSTALL_HOME
+    if [ $? -eq 0 ]
+    then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        echo -e "${RED}ABORTING: Please install manually.${NC}"
+        exit 1;
+    fi
     
     rm -rf $ZK_INSTALL_PATH
     mkdir -p $ZK_INSTALL_PATH
@@ -662,9 +691,9 @@ prepareZookeeperConfigFile()
         #-------- Create and Write the dataDir path
         if [ $ZK_INSTALL_MODE == "multi_server" ]
         then
-            local ZK_DATADIR=$ZK_DATADIR_BASE
+            local ZK_DATADIR=$ZK_DATADIR_BASE_PATH
         else
-            local ZK_DATADIR=$ZK_DATADIR_BASE/$i
+            local ZK_DATADIR=$ZK_DATADIR_BASE_PATH/$i
         fi
         mkdir -p $ZK_DATADIR >& /dev/null
         echo "dataDir=$ZK_DATADIR" >> $ZK_CONFIG_FILE_PATH
@@ -755,7 +784,7 @@ prepareZookeeperConfigFile()
         echo -e "${RED}ABORTING: Failed creating new file $ZK_ENV_FILE_NAME. Please install manually.${NC}"
         exit 1;
     fi
-    echo "ZOO_LOG_DIR="\""$ZK_LOGFILES_DIR"\""" >> $ZK_ENV_FILE_PATH
+    echo "ZOO_LOG_DIR="\""$ZK_LOGFILES_DIR_PATH"\""" >> $ZK_ENV_FILE_PATH
     if [ $? -ne 0 ]
     then
         echo -e "${RED}FAILED${NC}"
