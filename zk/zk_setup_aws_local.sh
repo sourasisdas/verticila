@@ -17,7 +17,7 @@ configureGlobals()
 
 
     EC2_LOCAL_INSTALLATION_DIR="/home/ec2-user/installed_softwares"
-    VERTICILA_EC2_ZK_SETUP_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup.sh"
+    VERTICILA_EC2_ZK_SETUP_SH="/home/ec2-user/installed_softwares/verticila/zk/zk_setup_core.sh"
     MY_PRIVATE_IP=`curl -s http://169.254.169.254/latest/meta-data/local-ipv4`
 
     ACTION="Invalid_Action"
