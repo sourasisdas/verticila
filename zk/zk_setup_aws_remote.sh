@@ -275,8 +275,8 @@ startFirstZookeeperNodeOnEc2()
     local shadowMode=$2
     local ec2InstanceId=$3
 
-    local startTimeout=120
-    local executionTimeout=180
+    local startTimeout=30
+    local executionTimeout=45
     local outputS3BucketName=$SSM_COMMAND_OUTPUT_S3_BUCKET_NAME
     local region=$REGION
 
@@ -290,8 +290,11 @@ startFirstZookeeperNodeOnEc2()
                               chown -R ec2-user:ec2-user verticila ; \
                               $VERTICILA_EC2_ZK_SETUP_AWS_LOCAL_SH -action start_first_node ; \
                              "
-    local ssmCommandStatus=$(invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion "\${scriptMode}" "\${shadowMode}" "\${remoteCommandToRun}" "\${ec2InstanceId}" "\${startTimeout}" "\${executionTimeout}" "\${outputS3BucketName}" "\${region}")
-    local status=$?
+
+    #echo "DEBUG: At zk_setup_aws_remote.sh : startFirstZookeeperNodeOnEc2 : 1" >> ~/x
+    ssmCommandId=$(invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion "\${scriptMode}" "\${shadowMode}" "\${remoteCommandToRun}" "\${ec2InstanceId}" "\${startTimeout}" "\${executionTimeout}" "\${outputS3BucketName}" "\${region}")
+    status=$?
+    #echo "DEBUG: At zk_setup_aws_remote.sh : startFirstZookeeperNodeOnEc2 : 2 : $status : $ssmCommandId" >> ~/x
 
     if [ $status -ne 0 ]
     then
@@ -299,13 +302,7 @@ startFirstZookeeperNodeOnEc2()
         return $status
     fi
 
-
-    #### Let SSM command execution finish, and get back status of it
-    #local totalTimeout=$(( $startTimeout + $executionTimeout ))
-    #local ssmCommandStatus=$(waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait "\${scriptMode}" "\${shadowMode}" "\${ssmCommandId}" "\${ec2InstanceId}" "\${totalTimeout}")
-    #status=$?
-
-    #echo $ssmCommandStatus
+    echo $ssmCommandId
     return $status
 }
 
@@ -337,7 +334,7 @@ undoAwsAndLocalResourceChanges()
 
 safeExit()
 {
-    local status=$1
+    status=$1
     if [ $status -ne 0 ]
     then
         undoAwsAndLocalResourceChanges
@@ -601,14 +598,14 @@ main()
 
 
         echo -e -n "-> Starting first Zookeeper node on EC2 with instance ID $EC2_ID ... : "
-        local ssmCommandId=$(startFirstZookeeperNodeOnEc2 ${SCRIPT_MODE} ${SHADOW_MODE} ${EC2_ID} )
+        ssmCommandId=$(startFirstZookeeperNodeOnEc2 ${SCRIPT_MODE} ${SHADOW_MODE} ${EC2_ID} )
         if [ $? -ne 0 ]
         then
             echo -e "${RED}ABORTING: Failed starting first Zookeeper node on EC2 instance ID ${NC}$EC2_ID${RED} due to failed/incomplete SSM command. To debug, look into SSM command history from AWS console. Script will exit.${NC}"
             echo "1"
             safeExit 1
         else
-            echo "started Zookeeper at $EC2_ID"
+            echo -e "${GREEN}started Zookeeper at $EC2_ID with SSM command ID $ssmCommandId ${NC}"
             safeExit 0
         fi
     fi

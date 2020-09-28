@@ -129,14 +129,15 @@ executeRemoteSsmCommandAndEchoReturnValue()
     eval outputS3BucketName="$6"
     eval region="$7"
 
-    local commandString="aws ssm send-command --document-name "\""AWS-RunShellScript"\"" --document-version "\""1"\"" --targets '[{"\""Key"\"":"\""InstanceIds"\"","\""Values"\"":["\""$ec2InstanceId"\""]}]' --parameters '{"\""commands"\"":["\""$remoteCommandToRun"\""],"\""workingDirectory"\"":["\""/home/ec2-user"\""],"\""executionTimeout"\"":["\""$executionTimeout"\""]}' --timeout-seconds $startTimeout --max-concurrency "\""50"\"" --max-errors "\""0"\"" --output-s3-bucket-name "\""$outputS3BucketName"\"" --region $region --query 'Command.CommandId' --output text"
+    commandString="aws ssm send-command --document-name "\""AWS-RunShellScript"\"" --document-version "\""1"\"" --targets '[{"\""Key"\"":"\""InstanceIds"\"","\""Values"\"":["\""$ec2InstanceId"\""]}]' --parameters '{"\""commands"\"":["\""$remoteCommandToRun"\""],"\""workingDirectory"\"":["\""/home/ec2-user"\""],"\""executionTimeout"\"":["\""$executionTimeout"\""]}' --timeout-seconds $startTimeout --max-concurrency "\""50"\"" --max-errors "\""0"\"" --output-s3-bucket-name "\""$outputS3BucketName"\"" --region $region --query 'Command.CommandId' --output text"
 
-    local trimmedCommandString="$(sed -e 's/[[:space:]]*$/ /' <<<${commandString})"
-    local status=0
+    trimmedCommandString="$(sed -e 's/[[:space:]]*$/ /' <<<${commandString})"
+    status=0
+    retVal=""
+    outStream="/dev/null"
     
     if [ $shadowMode -eq 0 ]
     then
-        local outStream="/dev/null"
         if [[ ! -z "${VERTICILA_LOG_FILE_NAME}" ]]
         then
             mkdir -p ~/.verticila/
@@ -152,8 +153,10 @@ executeRemoteSsmCommandAndEchoReturnValue()
             echo "################ $trimmedCommandString" >> $outStream 2>&1
         fi
 
-        local retVal=`eval $trimmedCommandString`
+        #echo "DEBUG: At aws_utils.sh : executeRemoteSsmCommandAndEchoReturnValue : 1 : $trimmedCommandString" >> ~/x
+        retVal=`eval $trimmedCommandString` >> ~/x
         status=$?
+        #echo "DEBUG: At aws_utils.sh : executeRemoteSsmCommandAndEchoReturnValue : 2 : $status : $retVal : $$" >> ~/x
         if [ $status -ne 0 ]
         then
             retVal="failed"

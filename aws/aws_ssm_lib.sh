@@ -18,10 +18,12 @@ invokeAndGetId_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_w
     eval wRegion="$8"
 
     source $VERTICILA_HOME/aws/aws_utils.sh
-    local ssmCommandId=$(executeRemoteSsmCommandAndEchoReturnValue "\${shadowMode}" "\${wRemoteCmdString}" "\${wEc2InstId}" "\${wStartTimeout}" "\${wExecTimeout}" "\${wOutS3BktName}" "\${wRegion}")
-    local status=$?
+    #echo "DEBUG: At aws_ssm_lib.sh : invokeAndGetId_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion : 1" >> ~/x
+    ssmCommandId=$(executeRemoteSsmCommandAndEchoReturnValue "\${shadowMode}" "\${wRemoteCmdString}" "\${wEc2InstId}" "\${wStartTimeout}" "\${wExecTimeout}" "\${wOutS3BktName}" "\${wRegion}")
+    status=$?
+    #echo "DEBUG: At aws_ssm_lib.sh : invokeAndGetId_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion : 2 : $status : $ssmCommandId" >> ~/x
     echo $ssmCommandId
-    return $?
+    return $status
 }
 
 
@@ -34,21 +36,23 @@ waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait()
     eval wTimeToWait="$5"
 
     ### Poll SSM command execution status every 1/100th of total time to wait
-    local totalTimeWaited=0
-    local timeToWaitInEachIteration=$(( $wTimeToWait / 100 ))
+    totalTimeWaited=0
+    timeToWaitInEachIteration=$(( $wTimeToWait / 10 ))
     while [ 1 ]
     do
         sleep $timeToWaitInEachIteration
 
-        local CommandString="aws ssm get-command-invocation \
+        commandString="aws ssm get-command-invocation \
                              --instance-id $wEc2InstId \
                              --command-id $wSsmCmdId \
                              --query 'StatusDetails' \
                              --output text"
 
         source $VERTICILA_HOME/aws/aws_utils.sh
-        local commandStatus=$(executeAwsCommandAndEchoReturnValue "\${shadowMode}" "\${commandString}")
-        local status=$?
+        #echo "DEBUG: At aws_ssm_lib.sh : waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait : 1" >> ~/x
+        commandStatus=$(executeAwsCommandAndEchoReturnValue "\${shadowMode}" "\${commandString}")
+        status=$?
+        #echo "DEBUG: At aws_ssm_lib.sh : waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait : 2 : $status : $commandStatus" >> ~/x
         if [ $status -ne 0 ]
         then
             echo -e "${RED}ssm_command_status_untraceable${NC}"
@@ -68,6 +72,7 @@ waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait()
         fi
 
         totalTimeWaited=$(( $totalTimeWaited + $timeToWaitInEachIteration ))
+        #echo "DEBUG: At aws_ssm_lib.sh : waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait : 3 : $totalTimeWaited : $totalTimeout" >> ~/x
         if [ $totalTimeWaited -ge $totalTimeout ]
         then
             echo -e "${RED}ssm_command_run_timeout${NC}"
@@ -87,23 +92,41 @@ invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeo
     eval wOutS3BktName="$7"
     eval wRegion="$8"
 
-    local ssmCommandId=$(invokeAndGetId_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion "\${scriptMode}" "\${shadowMode}" "\${wRemoteCmdString}" "\${wEc2InstId}" "\${wStartTimeout}" "\${wExecTimeout}" "\${wOutS3BktName}" "\${wRegion}")
-    local status=$?
+    #echo "DEBUG: At aws_ssm_lib.sh : invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion : 1" >> ~/x
+    ssmCommandId=$(invokeAndGetId_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion "\${scriptMode}" "\${shadowMode}" "\${wRemoteCmdString}" "\${wEc2InstId}" "\${wStartTimeout}" "\${wExecTimeout}" "\${wOutS3BktName}" "\${wRegion}")
+    status=$?
+    #echo "DEBUG: At aws_ssm_lib.sh : invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion : 2 : $status : $ssmCommandId" >> ~/x
 
     if [ $status -ne 0 ]
     then
-        echo -e "${RED}ssm_command_invocation_failed${NC}"
+        if [ $scriptMode -eq 0 ]
+        then
+            echo -e "${RED}ssm_command_invocation_failed${NC}"
+        fi
         return $status
     else
-        echo -e "${GREEN}ssh_command_invocation_success${NC}"
+        if [ $scriptMode -eq 0 ]
+        then
+            echo -e -n "${GREEN}ssm_command_invocation_success ${NC}"
+        fi
     fi
 
 
     ### Let SSM command execution finish, and get back status of it
-    local totalTimeout=$(( $wStartTimeout + $wExecTimeout ))
-    local ssmCommandStatus=$(waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait "\${scriptMode}" "\${shadowMode}" "\${ssmCommandId}" "\${wEc2InstId}" "\${totalTimeout}")
+    totalTimeout=$(( $wStartTimeout + $wExecTimeout ))
+    ssmCommandStatus=$(waitAndGetStatus_ofSsmCmd_wSsmCmdId_wEc2InstId_wTimeToWait "\${scriptMode}" "\${shadowMode}" "\${ssmCommandId}" "\${wEc2InstId}" "\${totalTimeout}")
     status=$?
+    #echo "DEBUG: At aws_ssm_lib.sh : invokeAndGetStatus_ofSsmCmd_wRemoteCmdString_wEc2InstId_wStartTimeout_wExecTimeout_wOutS3BktName_wRegion : 3 : $status : $ssmCommandStatus" >> ~/x
+    if [ $scriptMode -eq 0 ]
+    then
+        if [ $status -ne 0 ]
+        then
+            echo -e "${RED}$ssmCommandStatus${NC}"
+        else
+            echo -e "${GREEN}$ssmCommandStatus${NC}"
+        fi
+    fi
 
-    echo $ssmCommandStatus
+    echo $ssmCommandId
     return $status
 }
